@@ -1,0 +1,5 @@
+  pynverse
+  numpy
+  scipy
+  sklearn
+  matplotlib
