@@ -11,7 +11,7 @@ class LogisticLearner(object):
         #exit()
         reg = LogisticRegression(solver='lbfgs',max_iter=1000).fit(X, y)
         self.h = reg
-        return lambda x: reg.predict(x)[0]
+        return lambda x,single=True: reg.predict(x)[0] if single else reg.predict(x)
 
     def accuracy(self, X, y):
         return self.h.score(X,y)

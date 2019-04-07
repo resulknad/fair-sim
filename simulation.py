@@ -19,6 +19,8 @@ class Simulation(object):
         self.learner = self.LearnerCl()
         h = self.learner.fit(self.feat_desc.matrix_representation(include_protected=include_protected),self.Y)
 
+        self.Y_predicted = h(self.feat_desc.matrix_representation(include_protected=include_protected), single=False)
+
         # agents learn about cost
         self.agents = [self.AgentCl(cost, x, y, self.feat_desc, include_protected) for (cost, x, y) in zip(self.X_cost, self.feat_desc.iter_X(), self.Y)]
         for a in self.agents[:]:
@@ -31,6 +33,7 @@ class Simulation(object):
         y_new = ([a.y for a in self.agents])
         self.X_new = X_new
         self.y_new = y_new
+        self.Y_new_predicted = h(self.feat_desc.matrix_representation(X_new, include_protected=include_protected), single=False)
 
         print("Accuracy (h) post",self.learner.accuracy(self.feat_desc.matrix_representation(X_new, include_protected=include_protected),y_new))
 
@@ -61,11 +64,11 @@ class Simulation(object):
         title = ''
         if time == 'pre':
             X = self.X
-            y = self.Y
+            y = self.Y_predicted
             title = 'Pre'
         elif time == 'post':
             X = self.X_new
-            y = self.y_new
+            y = self.Y_new_predicted
             title = 'Post'
 
         y_domain = set(y)
