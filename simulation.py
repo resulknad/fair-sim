@@ -1,73 +1,65 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
+from transformer import AgentTransformer
+
 class Simulation(object):
-    def __init__(self, feat_desc, AgentCl, LearnerCl, cost_distribution):
-        self.feat_desc = feat_desc
-        self.X = feat_desc.X
-        self.Y = feat_desc.y
+    def __init__(self, dataset, AgentCl, LearnerCl, cost_distribution):
+        self.dataset = dataset
         self.cost_distribution = cost_distribution
         self.LearnerCl = LearnerCl
         self.AgentCl = AgentCl
 
 
     def start_simulation(self, include_protected=True):
-        # draw cost
-        self.X_cost = np.abs(self.cost_distribution(self.feat_desc.shape()[1]))
 
         # learner moves
         self.learner = self.LearnerCl()
-        h = self.learner.fit(self.feat_desc.matrix_representation(include_protected=include_protected),self.Y)
+        h = self.learner.fit(self.dataset.features,self.dataset.labels.ravel())
 
-        self.Y_predicted = h(self.feat_desc.matrix_representation(include_protected=include_protected), single=False)
+        self.Y_predicted = h(self.dataset.features)
 
-        # agents learn about cost
-        self.agents = [self.AgentCl(cost, x, y, self.feat_desc, include_protected) for (cost, x, y) in zip(self.X_cost, self.feat_desc.iter_X(), self.Y)]
-        for a in self.agents[:]:
-            a.act(h)
+        # agents move
+        at = AgentTransformer(self.AgentCl, h, self.cost_distribution)
+        dataset_ = at.transform(self.dataset)
 
-        print("Accuracy (h) pre",self.learner.accuracy(self.feat_desc.matrix_representation(include_protected=include_protected),self.Y))
+        print("Accuracy (h) pre",self.learner.accuracy(self.dataset.features,self.dataset.labels.ravel()))
 
         # update changed features
-        X_new = (self.feat_desc.combine_named_representations([a.x for a in self.agents]))
-        y_new = ([a.y for a in self.agents])
-        self.X_new = X_new
-        self.y_new = y_new
-        self.Y_new_predicted = h(self.feat_desc.matrix_representation(X_new, include_protected=include_protected), single=False)
+        self.Y_new_predicted = h(dataset_.features)
 
-        print("Accuracy (h) post",self.learner.accuracy(self.feat_desc.matrix_representation(X_new, include_protected=include_protected),y_new))
+        print("Accuracy (h) post",self.learner.accuracy(dataset_.features, dataset_.labels.ravel()))
 
         # fit data again, see if accuracy changes
         learner_ = self.LearnerCl()
-        learner_.fit(self.feat_desc.matrix_representation(X_new,include_protected=include_protected),y_new)
-        print("Accuracy (h*) post",learner_.accuracy(self.feat_desc.matrix_representation(X_new, include_protected=include_protected),y_new))
+        learner_.fit(dataset_.features, dataset_.labels.ravel())
+        print("Accuracy (h*) post",learner_.accuracy(dataset_.features, dataset_.labels.ravel()))
+        print(sum(dataset_.labels.ravel())," <- ", sum(self.dataset.labels.ravel()))
 
-        print(sum(y_new)," <- ", sum(self.Y))
+        self.dataset_new = dataset_
 
-
-        #plot h
-        #xvals = np.linspace(-100,100,1000) #100 points from 0 to 6 in ndarray
-        #yvals = list(map(lambda x: h([x]), xvals)) #evaluate f for each point in xvals
-        #plt.figure("h")
-        #plt.plot(xvals, yvals)
+        self.dataset_df = self.dataset.convert_to_dataframe(de_dummy_code=True)[0]
+        self.dataset_new_df = self.dataset_new.convert_to_dataframe(de_dummy_code=True)[0]
 
 
     def show_plots(self):
         plt.show()
 
     def plot_mutable_features(self):
-        plot_ft = lambda ft: self.plot_x(ft, self.X[ft], self.X_new[ft])
-        for ft in map(lambda x: x['name'], self.feat_desc.mutable_features()):
+        disc_and_mutable = self.dataset._discrete_and_mutable()
+        plot_ft = lambda ft: self.plot_x(ft, self.dataset_df[ft], self.dataset_new_df[ft])
+        for ft in disc_and_mutable:
             plot_ft(ft)
 
     def plot_group_y(self, time='pre'):
+        return
         title = ''
         if time == 'pre':
-            X = self.X
+            X = self.dataset.features
             y = self.Y_predicted
             title = 'Pre'
         elif time == 'post':
-            X = self.X_new
+            X = self.dataset_new.features
             y = self.Y_new_predicted
             title = 'Post'
 
@@ -90,9 +82,9 @@ class Simulation(object):
 
     def plot_x(self, text, data, data_new):
         plt.figure(text)
-        n, bins, patches = plt.hist(x=[data, data_new], label=['pre', 'post'], bins=10,
+        n, bins, patches = plt.hist(x=[sorted(data), sorted(data_new)], label=['pre', 'post'], bins=10,
                                     alpha=0.7, rwidth=0.85)
-        plt.xlim(left=min(min(data_new),min(data)), right=max(max(data_new),max(data)))
+#        plt.xlim(left=min(min(data_new),min(data)), right=max(max(data_new),max(data)))
         plt.legend(prop={'size': 10})
         plt.grid(axis='y', alpha=0.75)
         plt.xlabel('Value')
@@ -104,7 +96,6 @@ class Simulation(object):
         plt.ylim(top=np.ceil(maxfreq / 10) * 10 if maxfreq % 10 else maxfreq + 10)
 
         plt.show(block=False)
-        print(np.average(data_new),"<-",np.average(data))
 
 
 
