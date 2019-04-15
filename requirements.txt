@@ -6,3 +6,4 @@
   pandas==0.23.3
   aif360
   pathos
+  numba

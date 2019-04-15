@@ -1,3 +1,4 @@
+import time
 
 class RationalAgent:
     def __init__(self, h, dataset, cost, x, y):
@@ -15,4 +16,5 @@ class RationalAgent:
         return self.cost_fixed
 
     def incentive(self, x_new):
-        return self.benefit(x_new) - self.cost(x_new)
+        inc = self.benefit(x_new) - self.cost(x_new)
+        return inc

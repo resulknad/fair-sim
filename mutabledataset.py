@@ -5,6 +5,7 @@ import numpy as np
 
 from aif360.datasets import GermanDataset
 from aif360.datasets import StructuredDataset
+from aif360.datasets import BinaryLabelDataset
 
 
 class SimMixin:
@@ -15,9 +16,8 @@ class SimMixin:
         self.cost_fns = cost_fns
         self.discrete = discrete
 
-        # handle domain = 'auto'
-        self.domains = {k: self._get_domain(k) if v == 'auto' else v for k,v in domains.items()}
-        print(self.domains)
+        # handle domain != list
+        self.domains = {k: self._get_domain(k) if type(v) is not list else v for k,v in domains.items()}
 
     def _is_dummy_coded(self, ft):
         # fix this
@@ -46,7 +46,8 @@ class SimMixin:
 
         return result_obj
 
-
+    def _ft_index(self, ft):
+        return self.feature_names.index(ft)
 
     def _dummy_code_obj(self, obj, sep='='):
         result_obj = {}
@@ -61,16 +62,21 @@ class SimMixin:
 
 
     def _get_domain(self, ft):
-        if self._is_dummy_coded(ft):
-            # discrete
+        if callable(self.domains[ft]):
+            return [self.domains[ft]()]
+        elif self._is_dummy_coded(ft):
+            warnings.warn("Use set of values present in dataset to infer domain for feature " + ft)
+            # discrete, dummy coded
             return StructuredDataset._parse_feature_names(self.feature_names)[0][ft]
+        elif ft in self.discrete:
+            # discrete
+            warnings.warn("Use set of values present in dataset to infer domain for feature " + ft)
+            return list(set(self.features[:,self._ft_index(ft)]))
         else:
             # continious
             df, _ = self.convert_to_dataframe()
             warnings.warn("Used min/max for feature " + ft + " to infer domain + unsupported/not implemented yet")
             return (min(df[ft]), max(df[:,ft]))
-
-
 
     def _discrete_and_mutable(self):
         return list(set(self.mutable_features) & set(self.discrete))
@@ -92,9 +98,9 @@ class SimMixin:
         return (ft_names,crossproduct_iter)
 
 default_mappings = {
-    'label_maps': [{1.0: 'Good Credit', 0.0: 'Bad Credit'}],
-    'protected_attribute_maps': [{1.0: 'Male', 0.0: 'Female'},
-                                 {1.0: 'Old', 0.0: 'Young'}],
+    'label_maps': [{1.0: 'Good Credit', 0.0: 'Bad Credit'}]#,
+    #'protected_attribute_maps': [{1.0: 'Male', 0.0: 'Female'},
+    #                             {1.0: 'Old', 0.0: 'Young'}],
 }
 
 def custom_preprocessing(df):
@@ -118,3 +124,42 @@ class GermanSimDataset(GermanDataset, SimMixin):
         SimMixin.__init__(self, **sim_args)
 
 
+class NonLinSeparableDataset(BinaryLabelDataset, SimMixin):
+    def __init__(self, *args, **kwargs):
+        n = 100
+        # remove arguments for sim_args constructor
+        sim_args_names = ['mutable_features', 'domains', 'cost_fns', 'discrete']
+        sim_args = {k: kwargs.pop(k, None) for k in sim_args_names}
+
+        df = pd.DataFrame(data=np.array([[1,0,1],[0,1,1],[1,1,0],[0,1,0],[1,0,0],[0,1,0],[1,1,1],[0,1,1]]*n),columns = ['x0','x1', 'y'])
+        kwargs = {'df':df, 'label_names':['y'], 'protected_attribute_names':[]}
+
+        BinaryLabelDataset.__init__(self, **kwargs)
+        SimMixin.__init__(self, **sim_args)
+
+
+class CoateLouryDataset(BinaryLabelDataset, SimMixin):
+    def __init__(self, *args, **kwargs):
+        n = 1
+        # remove arguments for sim_args constructor
+        sim_args_names = ['mutable_features', 'domains', 'cost_fns', 'discrete']
+        sim_args = {k: kwargs.pop(k, None) for k in sim_args_names}
+
+        f_u_draw = kwargs.pop('f_u_draw')
+        f_q_draw = kwargs.pop('f_q_draw')
+
+        self.f_u_draw, self.f_q_draw = f_u_draw, f_q_draw
+
+        # one of each group, both unqualified
+        agents = [[0, 0, 0],[1, 0, 0]] * n
+
+        # add their signal theta drawn from f_u
+        agents = list(map(lambda x: x + [f_u_draw()], agents))
+        df = pd.DataFrame(data=np.array(agents),columns = ['group','educated', 'y', 'signal'])
+
+        kwargs = {'df':df, 'label_names':['y'], 'protected_attribute_names':['group']}
+
+        print(agents)
+
+        BinaryLabelDataset.__init__(self, **kwargs)
+        SimMixin.__init__(self, **sim_args)

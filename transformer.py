@@ -35,9 +35,6 @@ class AgentTransformer(Transformer):
 
         dataset_.features = features_
         dataset_.labels = np.array(labels_)
-        print(dataset.labels)
-        print(dataset_.labels)
-        assert(not (dataset_.labels == dataset.labels).all())
         return dataset_
 
 
