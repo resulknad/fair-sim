@@ -16,8 +16,9 @@ class SimMixin:
         self.cost_fns = cost_fns
         self.discrete = discrete
 
+    def infer_domain(self):
         # handle domain != list
-        self.domains = {k: self._get_domain(k) if type(v) is not list else v for k,v in domains.items()}
+        self.domains = {k: self._get_domain(k) if type(v) is not list else v for k,v in self.domains.items()}
 
     def _is_dummy_coded(self, ft):
         # fix this
@@ -59,6 +60,21 @@ class SimMixin:
             else:
                 result_obj[k] = v
         return result_obj
+
+    def dynamic_cost(self, x_new, x):
+        # no cost fns defined
+        if self.cost_fns is None or len(self.cost_fns) == 0:
+            return 0
+
+        assert(len(x_new)==1)
+        assert(len(x)==1)
+        cost = 0.0
+
+        # cost fns are defined per feature, sum them up
+        for new, old,ft in zip(x_new[0],x[0], self.feature_names):
+            if ft in self.cost_fns:
+                cost += self.cost_fns[ft](new, old)
+        return cost
 
 
     def _get_domain(self, ft):
@@ -160,6 +176,37 @@ class CoateLouryDataset(BinaryLabelDataset, SimMixin):
         kwargs = {'df':df, 'label_names':['y'], 'protected_attribute_names':['group']}
 
         print(agents)
+
+        BinaryLabelDataset.__init__(self, **kwargs)
+        SimMixin.__init__(self, **sim_args)
+
+
+class SimpleDataset(BinaryLabelDataset, SimMixin):
+    def _generateData(self):
+        threshold = 55
+        N = 1000
+        def generateX(grp, loc):
+            x = np.random.normal(loc=loc, scale=10., size=N)
+            x_noisy = x + np.random.normal(loc=0, scale=4., size=N)
+
+            y = list(map(lambda x: 1 if x>threshold else 0, x_noisy))
+
+            x = list(map(round, x))
+
+            return np.vstack(([x],[[grp]*N],[y])).transpose()
+
+        X = np.vstack((generateX(1,60), generateX(0,45)))
+        return pd.DataFrame(data=X, columns=['x', 'group', 'y'])
+
+
+    def __init__(self, *args, **kwargs):
+        # remove arguments for sim_args constructor
+        sim_args_names = ['mutable_features', 'domains', 'cost_fns', 'discrete']
+        sim_args = {k: kwargs.pop(k, None) for k in sim_args_names}
+
+        df = self._generateData()
+
+        kwargs = {'df':df, 'label_names':['y'], 'protected_attribute_names':['group']}
 
         BinaryLabelDataset.__init__(self, **kwargs)
         SimMixin.__init__(self, **sim_args)

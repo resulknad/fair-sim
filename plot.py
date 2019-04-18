@@ -7,9 +7,13 @@ import pandas as pd
 def block():
     plt.show()
 
-def plot_mutable_features(sim):
+def plot_mutable_features(sim,selection_criteria=[]):
     df,_ = sim.dataset.convert_to_dataframe(de_dummy_code=True)
     df_new,_ = sim.dataset_new.convert_to_dataframe(de_dummy_code=True)
+
+    if len(selection_criteria)>0:
+        df = _df_selection(df, selection_criteria)
+        df_new = _df_selection(df_new, selection_criteria)
 
     disc_and_mutable = sim.dataset._discrete_and_mutable()
     for ft in disc_and_mutable:

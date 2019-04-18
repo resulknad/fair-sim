@@ -10,9 +10,10 @@ from sklearn import svm
 from sklearn.model_selection import cross_val_score
 from aif360.algorithms.preprocessing import Reweighing
 from aif360.algorithms.inprocessing import AdversarialDebiasing
-from aif360.algorithms.postprocessing import EqOddsPostprocessing
+from aif360.algorithms.postprocessing import CalibratedEqOddsPostprocessing
 from aif360.datasets import BinaryLabelDataset
 from scipy.optimize import minimize
+from simulation import Simulation
 
 from aif360.metrics import BinaryLabelDatasetMetric
 from scipy import optimize
@@ -35,14 +36,16 @@ class StatisticalParityLogisticLearner(object):
         reg = LogisticRegression(solver='liblinear',max_iter=1000000000, C=1000000000000000000000.0).fit(dataset.features, dataset.labels.ravel())
         self.h = reg
 
+        assert(len(self.privileged_group)==1)
         assert(len(dataset.label_names) == 1)
 
         #df = dataset.convert_to_dataframe()[0].drop(columns=dataset.label_names)
+
+        dataset.features = np.array(list(map(np.array, dataset.features)))
         df = pd.DataFrame(data=dataset.features, columns=dataset.feature_names)
         # priv count
         print(self.privileged_group[0])
         n_p = len(_df_selection(df, self.privileged_group[0]).values)
-
 
         # not priv count
         n_np = len(_df_selection(df, self.unprivileged_group[0]).values)
@@ -59,18 +62,19 @@ class StatisticalParityLogisticLearner(object):
 
 
             stat_par_diff = n_np_y/n_np - n_p_y/n_p
-            # print(n_np_y,"of", n_np, n_p_y,"of",n_p,stat_par_diff)
+            #print("Boost:",boost,n_np_y,"of", n_np, n_p_y,"of",n_p,stat_par_diff)
             return stat_par_diff
 
-        boost = optimize.bisect(stat_parity_diff, 0, 1, xtol=self.eps)
-        print("Boost:",boost)
+        boost = optimize.bisect(stat_parity_diff, 0, 1, xtol=self.eps, disp=True)
+        #print("Boost:",boost)
 
-        grp_i = dataset.feature_names.index('age')
+        group_ft, unpriv_val = list(self.unprivileged_group[0].items())[0]
+        grp_i = dataset.feature_names.index(group_ft)
         def decision_fn(x,single=True):
             ys = []
             probs = list(map(lambda x: x[1], reg.predict_proba(x)))
             for x,p in zip(x,probs):
-                p_ = p + boost if x[grp_i] == 0 else p
+                p_ = p + boost if x[grp_i] == unpriv_val else p
                 if p_ > 0.5:
                     ys.append(1)
                 else:
@@ -185,22 +189,53 @@ class EqOddsPostprocessingLogisticLearner(object):
         reg = LogisticRegression(solver='liblinear',max_iter=1000000000, C=1000000000000000000000.0).fit(dataset.features, dataset.labels.ravel())
 
         dataset_p = dataset.copy()
-        dataset_p.labels = np.array(list(map(lambda x: [x], reg.predict(dataset.features))))
+        dataset_p.scores = np.array(list(map(lambda x: x[1],reg.predict_proba(dataset.features))))
+        #dataset_p.labels = np.array(list(map(lambda x: [x], reg.predict(dataset.features))))
 
-
-        eqodds = EqOddsPostprocessing(self.unprivileged_group, self.privileged_group)
+        eqodds = CalibratedEqOddsPostprocessing(unprivileged_groups=self.unprivileged_group, privileged_groups=self.privileged_group, cost_constraint='fpr')
         eqodds.fit(dataset, dataset_p)
 
         def h(x, single=True):
-            df,_ = dataset.convert_to_dataframe()
-            df.update(x)
-            dataset_ = BinaryLabelDataset(df=df, label_names=dataset.label_names, protected_attribute_names=dataset.protected_attribute_names)
+#            df,_ = dataset.convert_to_dataframe()
+#            df.update(x)
+#            dataset_ = BinaryLabelDataset(df=df, label_names=dataset.label_names, protected_attribute_names=dataset.protected_attribute_names)
 
-            dataset_ = dataset.align_datasets(dataset_)
-            dataset_.validate_dataset()
+#            dataset_ = dataset.align_datasets(dataset_)
+#            dataset_.validate_dataset()
+
+
+            # add dummy labels as we're going to predict them anyway...
+            x_with_labels = np.hstack((x, list(map(lambda x: [x], reg.predict(x)))))
+            scores = list(map(lambda x:x[1],reg.predict_proba(x)))
+            if single:
+                assert(len(x_with_labels) == 1)
+                x_with_labels = np.repeat(x_with_labels, 100, axis=0)
+                scores = np.repeat(scores, 100, axis=0)
+            dataset_ = Simulation.dataset_from_matrix(x_with_labels, dataset)
+            dataset_.scores = np.array(scores)
+            labels_pre = dataset_.labels
 
             dataset_ = eqodds.predict(dataset_)
-            return dataset_.labels[0] if single else dataset_.labels
+            # library does not support datasets with single instances
+            # workaround to extract probability w/o accessing stuff from the implementation
+            if single:
+                unique, counts = np.unique(dataset_.labels.ravel(), return_counts=True)
+                val, occurences = list(dict(zip(unique, counts)).items())[0]
+                random_int = np.random.randint(1, 101)
+                if random_int <= occurences:
+                    print(random_int,occurences,"deciding",val)
+                    dataset_.labels = [[val]]
+                else:
+                    dataset_.labels = [[1-val]]
+                    print(random_int,occurences,"deciding",1-val)
+                    # assuming (!) binary labels
+
+            if not (labels_pre == dataset_.labels).all() and single:
+                print("fav:",dataset_.favorable_label)
+                print("labels did change after eqodds.", labels_pre[0][0],"to", dataset_.labels,"for group",x_with_labels[0][1])
+            else:
+                print("did not change", len(x_with_labels))
+            return dataset_.labels[0] if single else dataset_.labels.ravel()
         self.h = h
         return h
 
