@@ -1,16 +1,15 @@
-
 import matplotlib.pyplot as plt
 from aif360.algorithms import Transformer
 from sklearn.neighbors import NearestNeighbors
 import numpy as np
 
-
-
 class AgentTransformer(Transformer):
-    def __init__(self, agent_class, h, cost_distribution, scaler):
+    def __init__(self, agent_class, h, cost_distribution, scaler, no_neighbors=51):
         self.agent_class = agent_class
         self.h = h
         self.cost_distribution = cost_distribution
+        self.no_neighbors = no_neighbors
+
         super(AgentTransformer, self).__init__(
             agent_class=agent_class,
             h=h,
@@ -80,7 +79,7 @@ class AgentTransformer(Transformer):
         assert(len(X_unchanged)==len(X)-len(changed_indices))
 
         # fit KNN to unchanged (during simulation) datapoints
-        nbrs = NearestNeighbors(n_neighbors=51).fit(X_unchanged)
+        nbrs = NearestNeighbors(n_neighbors=self.no_neighbors).fit(X_unchanged)
         _, indices = nbrs.kneighbors(X_changed)
 
         # for all changed datapoints
@@ -99,7 +98,6 @@ class AgentTransformer(Transformer):
         dataset_.features = X
         dataset_.labels = np.array(Y.tolist())
         return dataset_
-
 
     def _optimal_x(self, dataset, x, y, cost):
         # x0
