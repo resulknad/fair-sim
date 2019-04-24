@@ -86,7 +86,7 @@ class SimMixin:
             return StructuredDataset._parse_feature_names(self.feature_names)[0][ft]
         elif ft in self.discrete:
             # discrete
-            warnings.warn("Use set of values present in dataset to infer domain for feature " + ft)
+            #warnings.warn("Use set of values present in dataset to infer domain for feature " + ft)
             return list(set(self.features[:,self._ft_index(ft)]))
         else:
             # continious
@@ -187,7 +187,7 @@ class SimpleDataset(BinaryLabelDataset, SimMixin):
         N = 1000
         def generateX(grp, loc):
             x = np.random.normal(loc=loc, scale=10., size=N)
-            x_noisy = x + np.random.normal(loc=0, scale=4., size=N)
+            x_noisy = x + np.random.normal(loc=0, scale=20., size=N)
 
             y = list(map(lambda x: 1 if x>threshold else 0, x_noisy))
 

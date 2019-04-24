@@ -18,6 +18,7 @@ numba = "*"
 ipykernel = "*"
 jupyter = "*"
 tensorflow = "==1.1"
+seaborn = "*"
 
 [requires]
 python_version = "3.5"

@@ -2,15 +2,17 @@ from scipy.optimize import minimize
 import numpy as np
 from scipy import integrate
 import pandas as pd
-import tensorflow as tf
+#import tensorflow as tf
 from sklearn.linear_model import LinearRegression
 from sklearn.linear_model import LogisticRegression
 from sklearn.naive_bayes import MultinomialNB
 from sklearn import svm
 from sklearn.model_selection import cross_val_score
 from aif360.algorithms.preprocessing import Reweighing
-from aif360.algorithms.inprocessing import AdversarialDebiasing
-from aif360.algorithms.postprocessing import CalibratedEqOddsPostprocessing
+from aif360.algorithms.inprocessing import PrejudiceRemover
+from aif360.algorithms.postprocessing import EqOddsPostprocessing
+from fairlearn.classred import expgrad
+from fairlearn.moments import DP
 from aif360.datasets import BinaryLabelDataset
 from scipy.optimize import minimize
 from simulation import Simulation
@@ -19,12 +21,52 @@ from aif360.metrics import BinaryLabelDatasetMetric
 from scipy import optimize
 
 from plot import _df_selection
+from aif360.algorithms.postprocessing.reject_option_classification import RejectOptionClassification
 
 # util to calc accuracy
 def _accuracy(h, dataset):
     float_to_bool = lambda arr: np.array(list(map(lambda x: True if x == 1.0 else False, arr)))
     n_correct = (float_to_bool(h(dataset.features, False)) & float_to_bool(dataset.labels.ravel())).sum()
     return n_correct / len(dataset.labels.ravel())
+
+class RejectOptionsLogisticLearner(object):
+    def __init__(self, privileged_groups, unprivileged_groups):
+        self.privileged_group = privileged_groups
+        self.unprivileged_group = unprivileged_groups
+
+    def fit(self, dataset):
+        reg = LogisticRegression(solver='liblinear',max_iter=1000000000, C=1000000000000000000000.0).fit(dataset.features, dataset.labels.ravel())
+
+        dataset_p = dataset.copy(deepcopy=True)
+        dataset_p.scores = np.array(list(map(lambda x: [x[1]],reg.predict_proba(dataset.features))))
+        #print(reg.predict_proba(dataset.features))
+        #print(dataset_p.scores)
+        dataset_p.labels = np.array(list(map(lambda x: [x], reg.predict(dataset.features))))
+
+        ro = RejectOptionClassification(unprivileged_groups=self.unprivileged_group, privileged_groups=self.privileged_group,metric_name="Statistical parity difference")
+        ro.fit(dataset, dataset_p)
+
+        def h(x, single=True):
+            # add dummy labels as we're going to predict them anyway...
+            x_with_labels = np.hstack((x, list(map(lambda x: [x], reg.predict(x)))))
+            scores = list(map(lambda x:[x[1]],reg.predict_proba(x)))
+            if single:
+                assert(len(x_with_labels) == 1)
+                x_with_labels = np.repeat(x_with_labels, 100, axis=0)
+                scores = np.repeat(scores, 100, axis=0)
+            dataset_ = Simulation.dataset_from_matrix(x_with_labels, dataset)
+            dataset_.scores = np.array(scores)
+            labels_pre = dataset_.labels
+
+            dataset_ = ro.predict(dataset_)
+            return dataset_.labels.ravel()
+
+        self.h = h
+        return h
+
+
+    def accuracy(self, dataset):
+        return _accuracy(self.h, dataset)
 
 class StatisticalParityLogisticLearner(object):
     def __init__(self, privileged_group, unprivileged_group, eps):
@@ -44,7 +86,7 @@ class StatisticalParityLogisticLearner(object):
         dataset.features = np.array(list(map(np.array, dataset.features)))
         df = pd.DataFrame(data=dataset.features, columns=dataset.feature_names)
         # priv count
-        print(self.privileged_group[0])
+        #print(self.privileged_group[0])
         n_p = len(_df_selection(df, self.privileged_group[0]).values)
 
         # not priv count
@@ -87,6 +129,61 @@ class StatisticalParityLogisticLearner(object):
     def accuracy(self, dataset):
         return _accuracy(self.h, dataset)
 
+class FairLearnLearner(object):
+    def __init__(self, privileged_group, unprivileged_group):
+        self.privileged_group = privileged_group
+        self.unprivileged_group = unprivileged_group
+
+    def fit(self, dataset):
+        # sanity checks
+        assert(len(self.privileged_group)==1)
+        assert((self.privileged_group[0].keys()==self.unprivileged_group[0].keys()))
+        class_attr = list(self.privileged_group[0].keys())[0]
+
+        reg = LogisticRegression(solver='liblinear',max_iter=1000000000, C=1000000000000000000000.0)
+
+        class_ind = dataset.feature_names.index(class_attr)
+        X = pd.DataFrame(dataset.features)
+        A = pd.Series(dataset.features[:,class_ind])
+        Y = pd.Series(dataset.labels.ravel())
+
+        bc = expgrad(X, A, Y, reg, nu=2.9e-12, cons=DP()).best_classifier
+        bc_binary = lambda x: (list(bc(x) > 0.5))
+
+        self.h = lambda x,single=True: bc_binary(x)[0] if single else bc_binary(x)
+        return self.h
+
+    def accuracy(self, dataset):
+        return _accuracy(self.h, dataset)
+
+class PrejudiceRemoverLearner(object):
+    def __init__(self, privileged_group, unprivileged_group):
+        self.privileged_group = privileged_group
+        self.unprivileged_group = unprivileged_group
+
+    def fit(self, dataset):
+        # sanity checks
+        assert(len(self.privileged_group)==1)
+        assert((self.privileged_group[0].keys()==self.unprivileged_group[0].keys()))
+
+        class_attr = list(self.privileged_group[0].keys())[0]
+
+        # TODO: include sensitive attr?
+        pr = PrejudiceRemover(eta=1.0, sensitive_attr='group', class_attr='y')
+        pr.fit(dataset)
+        def h(x, single=True):
+            # add dummy labels, we'll predict them now anyway
+            x_with_labels = np.hstack((x, [[0]] * len(x)))
+            # construct dataset
+            dataset_ = Simulation.dataset_from_matrix(x_with_labels, dataset)
+
+            dataset_p = pr.predict(dataset_)
+            return dataset_p.labels.ravel()
+        self.h = h
+        return h
+
+    def accuracy(self, dataset):
+        return _accuracy(self.h, dataset)
 
 
 class LogisticLearner(object):
@@ -117,32 +214,7 @@ class ReweighingLogisticLearner(object):
                                              privileged_groups=self.privileged_group).mean_difference()
         dataset_ = RW.fit_transform(dataset)
 
-        print("before reweighing (meandiff):",mean_diff_metric(dataset),"after:",mean_diff_metric(dataset_))
-
-
-        reg = LogisticRegression(solver='liblinear',max_iter=1000000000, C=1000000000000000000000.0).fit(dataset_.features, dataset_.labels.ravel(), sample_weight=dataset_.instance_weights)
-        self.h = reg
-
-        return lambda x,single=True: reg.predict(x)[0] if single else reg.predict(x)
-
-    def accuracy(self, dataset):
-        return self.h.score(dataset.features, dataset.labels.ravel())
-
-class ReweighingLogisticLearner(object):
-    def __init__(self, privileged_group, unprivileged_group):
-        self.privileged_group = privileged_group
-        self.unprivileged_group = unprivileged_group
-
-    def fit(self, dataset):
-        RW = Reweighing(unprivileged_groups=self.unprivileged_group,
-                privileged_groups=self.privileged_group)
-
-        mean_diff_metric = lambda dataset: BinaryLabelDatasetMetric(dataset,
-                                             unprivileged_groups=self.unprivileged_group,
-                                             privileged_groups=self.privileged_group).mean_difference()
-        dataset_ = RW.fit_transform(dataset)
-
-        print("before reweighing (meandiff):",mean_diff_metric(dataset),"after:",mean_diff_metric(dataset_))
+        #print("before reweighing (meandiff):",mean_diff_metric(dataset),"after:",mean_diff_metric(dataset_))
 
 
         reg = LogisticRegression(solver='liblinear',max_iter=1000000000, C=1000000000000000000000.0).fit(dataset_.features, dataset_.labels.ravel(), sample_weight=dataset_.instance_weights)
@@ -154,32 +226,33 @@ class ReweighingLogisticLearner(object):
         return self.h.score(dataset.features, dataset.labels.ravel())
 
 
-class AdversialDebiasingLogisticLearner(object):
-    def __init__(self, **args):
-        self.args = args
 
-    def fit(self, dataset):
-        dataset.features = np.array(list(map(lambda x: np.array(x), dataset.features)))
-        self.args['sess'] = tf.Session()
-        self.args['scope_name'] = str(np.random.randint(1000000))
-
-        self.ad = AdversarialDebiasing(**self.args)
-
-        dataset_ = self.ad.fit_predict(dataset)
-
-
-        self.args['sess'].close()
-        tf.reset_default_graph()
-
-
-        reg = LogisticRegression(solver='liblinear',max_iter=1000000000, C=1000000000000000000000.0).fit(dataset_.features, dataset_.labels.ravel())
-        self.h = reg
-
-        return lambda x,single=True: reg.predict(x)[0] if single else reg.predict(x)
-
-    def accuracy(self, dataset):
-        return self.h.score(dataset.features, dataset.labels.ravel())
-
+#class AdversialDebiasingLogisticLearner(object):
+#    def __init__(self, **args):
+#        self.args = args
+#
+#    def fit(self, dataset):
+#        dataset.features = np.array(list(map(lambda x: np.array(x), dataset.features)))
+#        self.args['sess'] = tf.Session()
+#        self.args['scope_name'] = str(np.random.randint(1000000))
+#
+#        self.ad = AdversarialDebiasing(**self.args)
+#
+#        dataset_ = self.ad.fit_predict(dataset)
+#
+#
+#        self.args['sess'].close()
+#        tf.reset_default_graph()
+#
+#
+#        reg = LogisticRegression(solver='liblinear',max_iter=1000000000, C=1000000000000000000000.0).fit(dataset_.features, dataset_.labels.ravel())
+#        self.h = reg
+#
+#        return lambda x,single=True: reg.predict(x)[0] if single else reg.predict(x)
+#
+#    def accuracy(self, dataset):
+#        return self.h.score(dataset.features, dataset.labels.ravel())
+#
 class EqOddsPostprocessingLogisticLearner(object):
     def __init__(self, privileged_groups, unprivileged_groups):
         self.privileged_group = privileged_groups
@@ -192,17 +265,13 @@ class EqOddsPostprocessingLogisticLearner(object):
         dataset_p.scores = np.array(list(map(lambda x: x[1],reg.predict_proba(dataset.features))))
         #dataset_p.labels = np.array(list(map(lambda x: [x], reg.predict(dataset.features))))
 
-        eqodds = CalibratedEqOddsPostprocessing(unprivileged_groups=self.unprivileged_group, privileged_groups=self.privileged_group, cost_constraint='fpr')
+        eqodds = EqOddsPostprocessing(unprivileged_groups=self.unprivileged_group, privileged_groups=self.privileged_group)
         eqodds.fit(dataset, dataset_p)
 
         def h(x, single=True):
-#            df,_ = dataset.convert_to_dataframe()
-#            df.update(x)
-#            dataset_ = BinaryLabelDataset(df=df, label_names=dataset.label_names, protected_attribute_names=dataset.protected_attribute_names)
-
-#            dataset_ = dataset.align_datasets(dataset_)
-#            dataset_.validate_dataset()
-
+            # library does not support datasets with single instances
+            if single:
+                raise NotImplementedError
 
             # add dummy labels as we're going to predict them anyway...
             x_with_labels = np.hstack((x, list(map(lambda x: [x], reg.predict(x)))))
@@ -216,26 +285,14 @@ class EqOddsPostprocessingLogisticLearner(object):
             labels_pre = dataset_.labels
 
             dataset_ = eqodds.predict(dataset_)
-            # library does not support datasets with single instances
-            # workaround to extract probability w/o accessing stuff from the implementation
-            if single:
-                unique, counts = np.unique(dataset_.labels.ravel(), return_counts=True)
-                val, occurences = list(dict(zip(unique, counts)).items())[0]
-                random_int = np.random.randint(1, 101)
-                if random_int <= occurences:
-                    print(random_int,occurences,"deciding",val)
-                    dataset_.labels = [[val]]
-                else:
-                    dataset_.labels = [[1-val]]
-                    print(random_int,occurences,"deciding",1-val)
-                    # assuming (!) binary labels
 
-            if not (labels_pre == dataset_.labels).all() and single:
-                print("fav:",dataset_.favorable_label)
-                print("labels did change after eqodds.", labels_pre[0][0],"to", dataset_.labels,"for group",x_with_labels[0][1])
-            else:
-                print("did not change", len(x_with_labels))
-            return dataset_.labels[0] if single else dataset_.labels.ravel()
+            #if not (labels_pre == dataset_.labels).all():
+            #    print("fav:",dataset_.favorable_label)
+            #    print("labels did change after eqodds.", labels_pre[0][0],"to", dataset_.labels,"for group",x_with_labels[0][1])
+            #else:
+            #    print("did not change", len(x_with_labels))
+            return dataset_.labels.ravel()
+
         self.h = h
         return h
 

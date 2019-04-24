@@ -5,6 +5,25 @@ from transformer import AgentTransformer
 from agent import RationalAgent
 import pandas as pd
 
+class TestGroupDataset(BinaryLabelDataset, SimMixin):
+    def _generateData(self):
+
+        data = [[1,0,0], [1.9,0,1], [2.1,1,0], [3,1,1]]
+
+        return pd.DataFrame(data=data, columns=['x','group', 'y'])
+
+
+    def __init__(self, *args, **kwargs):
+        # remove arguments for sim_args constructor
+        sim_args_names = ['mutable_features', 'domains', 'cost_fns', 'discrete']
+        sim_args = {k: kwargs.pop(k, None) for k in sim_args_names}
+
+        df = self._generateData()
+
+        kwargs = {**kwargs, 'df':df, 'label_names':['y']}
+
+        BinaryLabelDataset.__init__(self, **kwargs)
+        SimMixin.__init__(self, **sim_args)
 
 class TestDataset(BinaryLabelDataset, SimMixin):
     def _generateData(self):
@@ -35,9 +54,6 @@ class TestAgentTransformer(unittest.TestCase):
 #    def tearDown(self):
 #        print("tear down")
 
-# test dynamic cost
-# test fixed cost
-
     def test_auto_domain(self):
         dataset = TestDataset(mutable_features=['x'],
             domains={'x': 'auto'},
@@ -62,7 +78,23 @@ class TestAgentTransformer(unittest.TestCase):
         dataset_ = at.transform(dataset)
         expectedFeatures = [[2.5], [2.5], [2.5], [2.5]]
         expectedLabels = [1] * 4
+        #print("expected", expectedFeatures, "reality", dataset_.features)
         assert((expectedFeatures == dataset_.features).all())
+        assert((expectedLabels == dataset_.labels.ravel()).all())
+
+    def test_group_not_included_in_knn(self):
+        dataset = TestGroupDataset(mutable_features=['x'],
+            domains={'x': 'auto'},
+            discrete=['x'],
+            cost_fns={'x':lambda x_new, x: 0 if abs(abs(x_new-x)-0.2)<0.001 else 1.1}, protected_attribute_names=['group'])
+
+        dataset.infer_domain()
+        h = lambda x,single=True: ([1.]*len(x))
+        print(h([1,2,3]))
+        at = AgentTransformer(RationalAgent, h, lambda size: [0]*size, None, no_neighbors=1)
+
+        dataset_ = at.transform(dataset)
+        expectedLabels = [0,1,0,1]
         assert((expectedLabels == dataset_.labels.ravel()).all())
 
     def test_fixed_cost_too_high(self):
@@ -125,6 +157,7 @@ class TestAgentTransformer(unittest.TestCase):
 
         expectedFeatures = [[2.5], [2.5], [2.5], [2.5]]
         expectedLabels = [1] * 4
+        #print("expected", expectedFeatures, "reality", dataset_.features)
         assert((expectedFeatures == dataset_.features).all())
         assert((expectedLabels == dataset_.labels.ravel()).all())
 

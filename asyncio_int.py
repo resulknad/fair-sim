@@ -1,6 +1,5 @@
 import asyncio
 
-
 future_list = []
 def h_async(val):
     global future_list
@@ -20,6 +19,7 @@ async def opt_x():
         h_val = h_async("some va")
         await h_val
         print(h_val.result())
+    return "Hi!"
 
 async def start():
     l = []
@@ -28,5 +28,8 @@ async def start():
 
     for i in l:
         await i
+        print(i.result())
+    return "bla"
 
-asyncio.run(start())
+print(asyncio.run(start()))
+

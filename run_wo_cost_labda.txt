@@ -1,0 +1,68 @@
+Aff. action (Fairlearn learner)
+Runs:  5 
+ Eps:  0.01  (+-  0.01 ) 
+ Acc h:  0.23  (+-  0.01 ) 
+
+StatPar Δ: 0.05
+Feature x (mean):
+(UP) Pre : 0.48 (+- 0.01 )
+(P) Pre  : 0.65 (+- 0.02 )
+(UP) Post: 0.52 (+- 0.01 )
+(P) Post : 0.68 (+- 0.02 )
+Post    Δ: 0.16
+
+
+No aff. action:
+Runs:  5 
+ Eps:  0.01  (+-  0.01 ) 
+ Acc h:  0.68  (+-  0.01 ) 
+
+StatPar Δ: 0.26
+Feature x (mean):
+(UP) Pre : 0.5 (+- 0.01 )
+(P) Pre  : 0.67 (+- 0.02 )
+(UP) Post: 0.56 (+- 0.01 )
+(P) Post : 0.68 (+- 0.02 )
+Post    Δ: 0.12
+
+
+Aff. action (Reweighing)
+Runs:  5 
+ Eps:  0.17  (+-  0.01 ) 
+ Acc h:  0.66  (+-  0.01 ) 
+
+StatPar Δ: 0.02
+Feature x (mean):
+(UP) Pre : 0.5 (+- 0.02 )
+(P) Pre  : 0.68 (+- 0.02 )
+(UP) Post: 0.53 (+- 0.02 )
+(P) Post : 0.71 (+- 0.03 )
+Post    Δ: 0.18
+
+
+Aff. action (Reject Option)
+Runs:  5 
+ Eps:  0.12  (+-  0.09 ) 
+ Acc h:  0.22  (+-  0.01 ) 
+
+StatPar Δ: 0.01
+Feature x (mean):
+(UP) Pre : 0.49 (+- 0.03 )
+(P) Pre  : 0.64 (+- 0.04 )
+(UP) Post: 0.53 (+- 0.03 )
+(P) Post : 0.68 (+- 0.04 )
+Post    Δ: 0.15
+
+
+Aff. action (DIY Stat. Parity enforcer)
+Runs:  5 
+ Eps:  0.05  (+-  0.02 ) 
+ Acc h:  0.4  (+-  0.01 ) 
+
+StatPar Δ: 0.01
+Feature x (mean):
+(UP) Pre : 0.5 (+- 0.01 )
+(P) Pre  : 0.67 (+- 0.01 )
+(UP) Post: 0.51 (+- 0.01 )
+(P) Post : 0.68 (+- 0.01 )
+Post    Δ: 0.17

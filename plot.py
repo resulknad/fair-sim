@@ -35,6 +35,8 @@ def plot_mutable_features(sim,selection_criteria=[]):
 
 
 def _df_selection(df, selection_criteria):
+    if len(selection_criteria.items()) == 0:
+        return df
     # ands all the selection criterias, returns selected rows
     arr = list(map(lambda tpl: np.array(df[tpl[0]] == tpl[1]), selection_criteria.items()))
     return df[reduce(lambda x,y: x&y, arr)]
