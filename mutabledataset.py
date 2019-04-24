@@ -125,6 +125,9 @@ def custom_preprocessing(df):
     status_map = {'A91': 'male', 'A93': 'male', 'A94': 'male',
                   'A92': 'female', 'A95': 'female'}
     df['sex'] = df['personal_status'].replace(status_map)
+    df['savings'] = df['savings'].replace({'A61': 0, 'A62': 1, 'A63': 2, 'A64': 3, 'A65':5})
+    df['credit_amount'] = (df['credit_amount']/max(df['credit_amount'])).apply(lambda x: round(x*4)/4.)
+    df['month'] = (df['month']/max(df['month'])).apply(lambda x: round(x*4)/4.)
     df['credit'] = df['credit'].map(lambda x: 2-x)
     return df
 
@@ -136,6 +139,10 @@ class GermanSimDataset(GermanDataset, SimMixin):
 
         kwargs['custom_preprocessing'] = custom_preprocessing
         kwargs['metadata'] = default_mappings
+        kwargs['categorical_features'] = ['status', 'credit_history', 'purpose',
+                     'employment', 'other_debtors', 'property',
+                     'installment_plans', 'housing', 'skill_level', 'telephone',
+'foreign_worker']
         GermanDataset.__init__(*(tuple([self]) + args), **kwargs)
         SimMixin.__init__(self, **sim_args)
 

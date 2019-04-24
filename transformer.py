@@ -48,7 +48,6 @@ class AgentTransformer(Transformer):
 
 # may now execute h, got enough xs
         if len(self.async_future_list) == self.async_no_wait:
-            #print("resolving")
             future_copy = self.async_future_list.copy()
             self.async_future_list = []
 
@@ -189,8 +188,12 @@ class AgentTransformer(Transformer):
 
         # iterate over all discrete permutations
         ft_names, permutations = dataset.discrete_permutations()
+        permutations = list(permutations)
         #incentives = []
+        i = 0
         for p in permutations:
+            i+=1
+            #print(i,"out of", len(permutations))
             p_obj = {k:v for k,v in zip(ft_names,p)}
 
             # modified x
@@ -199,8 +202,8 @@ class AgentTransformer(Transformer):
 
             # update opt if better
             incentive = await a.incentive([x_mod_vec])
-            cost = await a.cost([(x_mod_vec)])
-            benefit = await a.benefit([(x_mod_vec)])
+            #cost = await a.cost([(x_mod_vec)])
+            #benefit = await a.benefit([(x_mod_vec)])
         #    incentives.append([x_['x'], incentive, cost, benefit])
             if incentive > opt_incentive:
                 opt_incentive, opt_x = incentive, x_
