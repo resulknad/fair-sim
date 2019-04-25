@@ -9,7 +9,7 @@ import uuid
 
 class AgentTransformer(Transformer):
 # this class is not thread safe
-    def __init__(self, agent_class, h, cost_distribution, scaler, no_neighbors=15, collect_incentive_data=False):
+    def __init__(self, agent_class, h, cost_distribution, scaler, no_neighbors=51, collect_incentive_data=True):
         self.agent_class = agent_class
         self.h = h
         self.cost_distribution = cost_distribution
@@ -136,18 +136,18 @@ class AgentTransformer(Transformer):
 
         unprotected_feature_indices = list(map(lambda x: not x in dataset.protected_attribute_names, dataset.feature_names))
         # fit KNN to unchanged (during simulation) datapoints
-        nbrs = NearestNeighbors(n_neighbors=self.no_neighbors).fit(X_unchanged[:,unprotected_feature_indices])
+        nbrs = NearestNeighbors(n_neighbors=self.no_neighbors).fit(dataset.features[:,unprotected_feature_indices])
         _, indices = nbrs.kneighbors(X_changed[:,unprotected_feature_indices])
 
         # for all changed datapoints
         for i, x, neighbors in zip(range(len(X_changed)), X_changed,indices):
             # get labels of nearest neighbors
-            neighbor_labels = Y_unchanged[neighbors]
+            neighbor_labels = np.array(dataset.labels)[neighbors]
             unique, counts = np.unique(neighbor_labels, return_counts=True)
 
             # set own label to the most common one among neighbors
             _,label = sorted(zip(counts,unique), key=lambda x: x[0], reverse=True)[0]
-            Y_changed[i] = label
+            Y_changed[i] = np.array([label])
 
         Y[changed_indices] = Y_changed
 

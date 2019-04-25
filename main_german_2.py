@@ -15,7 +15,8 @@ from mutabledataset import GermanSimDataset
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-mutable_attrs = ['savings', 'credit_amount', 'month', 'savings', 'investment_as_income_percentage']
+group_attr = 'foreign_worker'
+mutable_attrs = ['credit_amount', 'month', 'savings', 'investment_as_income_percentage']
 
 def do_sim(learner,l,m):
     print("l",l,"m",m)
@@ -23,18 +24,19 @@ def do_sim(learner,l,m):
     M = m
     cp = lambda x_new, x: (pow(x_new/2.,2.)*(1-M)+abs(x_new-x)*M)*L #lambda x_new, x: x_new/2.+1*abs(x_new-x)/4.
     cn = lambda x_new, x: (pow((1-x_new)/2.,2.)*(1-M)+abs(x_new-x)*M)*L #lambda x_new, x: x_new/2.+1*abs(x_new-x)/4.
-    cost_fixed = lambda size: np.abs(np.random.normal(loc=0.5,size=size))
+    cost_fixed = lambda size: np.abs(np.random.normal(loc=.5,scale=0.75,size=size))
 
     g = GermanSimDataset(mutable_features=mutable_attrs,
             domains={k: 'auto' for k in mutable_attrs},
                          discrete=mutable_attrs,
-                         protected_attribute_names=['age'],
+                         protected_attribute_names=[group_attr],
                          cost_fns={'number_of_credits': cn, 'credit_amount': cn, 'month': cn, 'savings': cp, 'investment_as_income_percentage': cp},
-                         privileged_classes=[lambda x: x >= 25],
-                         features_to_drop=['personal_status', 'sex'])
+                         privileged_classes=[[1]],
+                         features_to_drop=['personal_status', 'sex', 'credit_history','other_debtors','purpose','status','skill_level', 'employment', 'property', 'housing', 'people_liable_for', 'installment_plans','telephone','residence_since', 'age'])
 
-    privileged_groups = [{'age': 1}]
-    unprivileged_groups = [{'age': 0}]
+
+    privileged_groups = [{group_attr: 1}]
+    unprivileged_groups = [{group_attr: 0}]
 
     sim = Simulation(g,
                      RationalAgent,
@@ -58,14 +60,14 @@ def do_sim(learner,l,m):
 
 def print_stats(result_set, name):
     print(result_set)
-    print("StatPar Δ:", round(result_set.stat_parity_diff({'age': 0}, {'age': 1}),2))
+    print("StatPar Δ:", round(result_set.stat_parity_diff({group_attr: 0}, {group_attr: 1}),2))
     #print("Feature x (mean):")
     #print("(UP) Pre :", pre_up_mean, "(+-", pre_up_std, ")")
     #print("(P) Pre  :", pre_p_mean, "(+-", pre_p_std, ")")
     #print("(UP) Post:", post_up_mean, "(+-", post_up_std, ")")
     #print("(P) Post :", post_p_mean, "(+-", post_p_std, ")")
-    pre_up_mean, pre_up_std, post_up_mean, post_up_std = tuple(map(lambda x: round(x,2),result_set.feature_average('credit', {'age':0})))
-    pre_p_mean, pre_p_std, post_p_mean, post_p_std = tuple(map(lambda x: round(x,2),result_set.feature_average('credit', {'age':1})))
+    pre_up_mean, pre_up_std, post_up_mean, post_up_std = tuple(map(lambda x: round(x,2),result_set.feature_average('credit', {group_attr:0})))
+    pre_p_mean, pre_p_std, post_p_mean, post_p_std = tuple(map(lambda x: round(x,2),result_set.feature_average('credit', {group_attr:1})))
     print('y (up):',pre_up_mean, post_up_mean)
     print('y (p):', pre_p_mean, post_p_mean)
 
@@ -73,8 +75,8 @@ def print_stats(result_set, name):
     movement = []
     movement_up = []
     for mutable_attr in mutable_attrs:
-        pre_up_mean, pre_up_std, post_up_mean, post_up_std = tuple(map(lambda x: round(x,2),result_set.feature_average(mutable_attr, {'age':0})))
-        pre_p_mean, pre_p_std, post_p_mean, post_p_std = tuple(map(lambda x: round(x,2),result_set.feature_average(mutable_attr, {'age':1})))
+        pre_up_mean, pre_up_std, post_up_mean, post_up_std = tuple(map(lambda x: round(x,2),result_set.feature_average(mutable_attr, {group_attr:0})))
+        pre_p_mean, pre_p_std, post_p_mean, post_p_std = tuple(map(lambda x: round(x,2),result_set.feature_average(mutable_attr, {group_attr:1})))
         diff_pre = abs(pre_p_mean-pre_up_mean)
         diff += abs(post_p_mean-post_up_mean)
         movement.append(pre_p_mean-post_p_mean)
@@ -83,17 +85,17 @@ def print_stats(result_set, name):
     print("Pre     Δ:", round(diff_pre,2))
     print("Movement (p,up):", movement, movement_up)
 
-    return [name,l,m,diff,round(result_set.stat_parity_diff({'age': 0}, {'age': 1}),2),result_set.eps, result_set.eps_std]
+    return [name,l,m,diff,round(result_set.stat_parity_diff({group_attr: 0}, {group_attr: 1}),2),result_set.eps, result_set.eps_std]
 
     #sns.set()
     #plt.figure(name)
-    #ax = sns.lineplot(x=mutable_attr, y="incentive",hue='age',data=(rs._avg_incentive(mutable_attr, 'age')).reset_index())
+    #ax = sns.lineplot(x=mutable_attr, y="incentive",hue=group_attr,data=(rs._avg_incentive(mutable_attr, group_attr)).reset_index())
     #plt.savefig(name+".png")
 
 result = []
-for l,m in itertools.product(np.linspace(0,1,5), np.linspace(0,1,5)):
-    privileged_groups = [{'age': 1}]
-    unprivileged_groups = [{'age': 0}]
+for l,m in itertools.product(np.linspace(0.1,0.1,1), np.linspace(0.5,0.5,1)):
+    privileged_groups = [{group_attr: 1}]
+    unprivileged_groups = [{group_attr: 0}]
 
     print("No aff. action:")
     rs = do_sim(LogisticLearner(), l, m)

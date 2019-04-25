@@ -50,10 +50,6 @@ class RejectOptionsLogisticLearner(object):
             # add dummy labels as we're going to predict them anyway...
             x_with_labels = np.hstack((x, list(map(lambda x: [x], reg.predict(x)))))
             scores = list(map(lambda x:[x[1]],reg.predict_proba(x)))
-            if single:
-                assert(len(x_with_labels) == 1)
-                x_with_labels = np.repeat(x_with_labels, 100, axis=0)
-                scores = np.repeat(scores, 100, axis=0)
             dataset_ = Simulation.dataset_from_matrix(x_with_labels, dataset)
             dataset_.scores = np.array(scores)
             labels_pre = dataset_.labels
@@ -193,9 +189,9 @@ class LogisticLearner(object):
         #reg = MultinomialNB().fit(X,y)
         reg = LogisticRegression(solver='liblinear',max_iter=1000000000, C=1000000000000000000000.0).fit(dataset.features, dataset.labels.ravel())
 
-        print(sorted(list(zip(dataset.feature_names,reg.coef_[0])),key=lambda x: abs(x[1])))
+        #print(sorted(list(zip(dataset.feature_names,reg.coef_[0])),key=lambda x: abs(x[1])))
         #exit(1)
-        #self.h = reg
+        self.h = reg
 
         return lambda x,single=True: reg.predict(x)[0] if single else reg.predict(x)
 
