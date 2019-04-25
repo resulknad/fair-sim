@@ -1,12 +1,9 @@
-# next steps:
-# plot incentives (avg per group)
-# do grid search, plot outcomes in terms of relevant parameters
-# do jupyter story
-
+import itertools
 from mutabledataset import SimpleDataset
 from agent import RationalAgent
 from simulation import Simulation
 from learner import LogisticLearner
+import pandas as pd
 import plot
 import numpy as np
 from learner import StatisticalParityLogisticLearner
@@ -20,9 +17,10 @@ import seaborn as sns
 
 mutable_attrs = ['savings', 'credit_amount', 'month', 'savings', 'investment_as_income_percentage']
 
-def do_sim(learner):
-    L = 0.1
-    M = 0.3
+def do_sim(learner,l,m):
+    print("l",l,"m",m)
+    L = l
+    M = m
     cp = lambda x_new, x: (pow(x_new/2.,2.)*(1-M)+abs(x_new-x)*M)*L #lambda x_new, x: x_new/2.+1*abs(x_new-x)/4.
     cn = lambda x_new, x: (pow((1-x_new)/2.,2.)*(1-M)+abs(x_new-x)*M)*L #lambda x_new, x: x_new/2.+1*abs(x_new-x)/4.
     cost_fixed = lambda size: np.abs(np.random.normal(loc=0.5,size=size))
@@ -55,7 +53,7 @@ def do_sim(learner):
     #                 learner,
     #                 cost_fixed)
 
-    result_set = sim.start_simulation(runs=3)
+    result_set = sim.start_simulation(runs=4)
     return result_set
 
 def print_stats(result_set, name):
@@ -85,36 +83,42 @@ def print_stats(result_set, name):
     print("Pre     Δ:", round(diff_pre,2))
     print("Movement (p,up):", movement, movement_up)
 
+    return [name,l,m,diff,round(result_set.stat_parity_diff({'age': 0}, {'age': 1}),2),result_set.eps, result_set.eps_std]
+
     #sns.set()
     #plt.figure(name)
     #ax = sns.lineplot(x=mutable_attr, y="incentive",hue='age',data=(rs._avg_incentive(mutable_attr, 'age')).reset_index())
     #plt.savefig(name+".png")
 
-privileged_groups = [{'age': 1}]
-unprivileged_groups = [{'age': 0}]
+result = []
+for l,m in itertools.product(np.linspace(0,1,5), np.linspace(0,1,5)):
+    privileged_groups = [{'age': 1}]
+    unprivileged_groups = [{'age': 0}]
 
-print("No aff. action:")
-rs = do_sim(LogisticLearner())
-print_stats(rs, "noaff")
-print("\n")
+    print("No aff. action:")
+    rs = do_sim(LogisticLearner(), l, m)
+    result.append(print_stats(rs, "noaff"))
+    print("\n")
 
-print("Aff. action (DIY Stat. Parity enforcer)")
-rs = do_sim(StatisticalParityLogisticLearner(privileged_groups, unprivileged_groups, eps=0.001))
-print_stats(rs, "postDIY")
+    #print("Aff. action (DIY Stat. Parity enforcer)")
+    #rs = do_sim(StatisticalParityLogisticLearner(privileged_groups, unprivileged_groups, eps=0.001))
+    #print_stats(rs, "postDIY")
 
-print("Aff. action (Fairlearn learner)")
-rs = do_sim(FairLearnLearner(privileged_groups, unprivileged_groups))
-print_stats(rs, "in")
-print("\n")
+    #print("Aff. action (Fairlearn learner)")
+    #rs = do_sim(FairLearnLearner(privileged_groups, unprivileged_groups))
+    #print_stats(rs, "in")
+    #print("\n")
 
 
 
-print("Aff. action (Reweighing)")
-rs = do_sim(ReweighingLogisticLearner(privileged_groups, unprivileged_groups))
-print_stats(rs, "pre")
-print("\n")
+    #print("Aff. action (Reweighing)")
+    #rs = do_sim(ReweighingLogisticLearner(privileged_groups, unprivileged_groups))
+    #print_stats(rs, "pre")
+    #print("\n")
 
-print("Aff. action (Reject Option)")
-rs = do_sim(RejectOptionsLogisticLearner(privileged_groups, unprivileged_groups))
-print_stats(rs, "post")
-print("\n")
+    print("Aff. action (Reject Option)")
+    rs = do_sim(RejectOptionsLogisticLearner(privileged_groups, unprivileged_groups),l,m)
+    result[len(result)-1] = result[len(result)-1] + print_stats(rs, "post")
+    print("\n")
+
+print(pd.DataFrame(result, columns=['name', 'l','m','mutdelt','statpar','eps','eps_std']*2).to_csv('output.csv'))

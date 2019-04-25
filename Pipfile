@@ -17,8 +17,9 @@ pathos = "*"
 numba = "*"
 ipykernel = "*"
 jupyter = "*"
-tensorflow = "==1.1"
+tensorflow = "*"
 seaborn = "*"
+fairlearn = "*"
 
 [requires]
-python_version = "3.5"
+python_version = "3.7"
