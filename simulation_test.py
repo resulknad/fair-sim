@@ -1,6 +1,6 @@
 import unittest
 from aif360.datasets import BinaryLabelDataset
-from mutabledataset import SimMixin
+from mutabledataset import SimMixin, GermanSimDataset
 from learner import _accuracy
 from simulation import Simulation
 import pandas as pd
@@ -46,6 +46,7 @@ class TestDataset(BinaryLabelDataset, SimMixin):
         BinaryLabelDataset.__init__(self, **kwargs)
         SimMixin.__init__(self, **sim_args)
 
+
 class TestSimulation(unittest.TestCase):
     def test_label_swap(self):
         # should swapp the labels in prediction
@@ -59,14 +60,24 @@ class TestSimulation(unittest.TestCase):
                          TestAgent,
                          TestLearner(),
                          lambda size: [0]*size)
-        res = sim.start_simulation(runs=1000, scale=False)
+        res = sim.start_simulation(runs=100, scale=False)
 
-        for r in res:
+        for r in res.results:
             assert((r.df_new == r.df).all().all())
             assert((r.df_new['credit_h'] == [1,1,0,0]).all())
             #print("expected", expectedFeatures, "reality", dataset_.features)
             #assert((expectedFeatures == dataset_.features).all())
             #assert((expectedLabels == dataset_.labels.ravel()).all())
+
+    # one hot encoded features are not simulatable
+    def test_onehot(self):
+        # should swapp the labels in prediction
+        dataset = GermanSimDataset(mutable_features=['purpose'],
+            domains={'purpose': 'auto'},
+            discrete=['purpose'],
+            cost_fns={}, protected_attribute_names=[], features_to_drop=['personal_status', 'sex'])
+        with self.assertRaises(Exception):
+            dataset.infer_domain()
 
 if __name__ == '__main__':
     unittest.main()

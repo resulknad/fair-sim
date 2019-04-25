@@ -81,6 +81,7 @@ class SimMixin:
         if callable(self.domains[ft]):
             return [self.domains[ft]()]
         elif self._is_dummy_coded(ft):
+            raise Exception("Can't use dummy coded for sim")
             warnings.warn("Use set of values present in dataset to infer domain for feature " + ft)
             # discrete, dummy coded
             return StructuredDataset._parse_feature_names(self.feature_names)[0][ft]
@@ -114,7 +115,7 @@ class SimMixin:
         return (ft_names,crossproduct_iter)
 
 default_mappings = {
-    'label_maps': [{1.0: 'Good Credit', 0.0: 'Bad Credit'}]#,
+    #'label_maps': [{1.0: 'Good Credit', 0.0: 'Bad Credit'}]#,
     #'protected_attribute_maps': [{1.0: 'Male', 0.0: 'Female'},
     #                             {1.0: 'Old', 0.0: 'Young'}],
 }

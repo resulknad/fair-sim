@@ -9,7 +9,7 @@ import uuid
 
 class AgentTransformer(Transformer):
 # this class is not thread safe
-    def __init__(self, agent_class, h, cost_distribution, scaler, no_neighbors=51, collect_incentive_data=True):
+    def __init__(self, agent_class, h, cost_distribution, scaler, no_neighbors=15, collect_incentive_data=False):
         self.agent_class = agent_class
         self.h = h
         self.cost_distribution = cost_distribution
@@ -88,8 +88,7 @@ class AgentTransformer(Transformer):
 
         for task,x,y,c in zip(task_list,dataset.features, dataset.labels, cost):
             await task
-            incentive, x_ = task.result()
-            x_vec = dataset.obj_to_vector(x_)
+            incentive, x_vec = task.result()
 
             if incentive > 0 and not (x_vec == x).all():
         #        if x_['group'] == 0:
@@ -179,26 +178,29 @@ class AgentTransformer(Transformer):
     async def _optimal_x(self, dataset, x, y, cost):
         uid = uuid.uuid4().hex
         # x0
-        x_obj = dataset.vector_to_object(x)
         a = self.agent_class(self.h_async, dataset, cost, [x], y)
 
         # max tracking
         opt_incentive = -1
-        opt_x = x_obj
+        opt_x = x
+        x_mod_vec = x.copy()
 
         # iterate over all discrete permutations
         ft_names, permutations = dataset.discrete_permutations()
+        ft_changed_ind = list(map(lambda y: dataset.feature_names.index(y), ft_names))
         permutations = list(permutations)
         #incentives = []
         i = 0
         for p in permutations:
             i+=1
             #print(i,"out of", len(permutations))
-            p_obj = {k:v for k,v in zip(ft_names,p)}
+            #p_obj = {k:v for k,v in zip(ft_names,p)}
 
             # modified x
-            x_ = {**x_obj, **p_obj}
-            x_mod_vec = dataset.obj_to_vector(x_)
+            #x_ = {**x_obj, **p_obj}
+            #x_mod_vec = dataset.obj_to_vector(x_)
+
+            x_mod_vec[ft_changed_ind] = p
 
             # update opt if better
             incentive = await a.incentive([x_mod_vec])
@@ -206,7 +208,7 @@ class AgentTransformer(Transformer):
             #benefit = await a.benefit([(x_mod_vec)])
         #    incentives.append([x_['x'], incentive, cost, benefit])
             if incentive > opt_incentive:
-                opt_incentive, opt_x = incentive, x_
+                opt_incentive, opt_x = incentive, x_mod_vec
 
             if self.collect_incentive_data:
                 self.incentives.append(np.hstack(([uid], x,x_mod_vec,[incentive])))

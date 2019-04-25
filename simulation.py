@@ -11,10 +11,11 @@ import re
 from transformer import AgentTransformer
 
 class Simulation(object):
-    def __init__(self, dataset, AgentCl, learner, cost_distribution):
+    def __init__(self, dataset, AgentCl, learner, cost_distribution, split=[0.5]):
         self.dataset = dataset
         self.cost_distribution = cost_distribution
         self.learner = learner
+        self.split = split
         self.AgentCl = AgentCl
 
 
@@ -43,12 +44,13 @@ class Simulation(object):
         dataset = self.dataset.copy(deepcopy=True)
         # we need at least one example for each class in each of the two splits
         while True:
-            train,test = dataset.split(2, shuffle=True)
+            train,test = dataset.split(self.split, shuffle=True)
             break
             if self.no_classes(train) >= 2 and self.no_classes(test) >= 2:
                 break
         train_indices = list(map(int, train.instance_names))
         test_indices = list(map(int, test.instance_names))
+        print(train.features.shape, test.features.shape)
 
 
         self.train, self.test = train,test
