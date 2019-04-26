@@ -94,7 +94,7 @@ class TestAgentTransformer(unittest.TestCase):
         at = AgentTransformer(RationalAgent, h, lambda size: [0]*size, None, no_neighbors=1)
 
         dataset_ = at.transform(dataset)
-        expectedLabels = [0,1,0,1]
+        expectedLabels = [0,0,1,1]
         assert((expectedLabels == dataset_.labels.ravel()).all())
 
     def test_fixed_cost_too_high(self):
@@ -135,6 +135,8 @@ class TestAgentTransformer(unittest.TestCase):
 
         expectedFeatures = [[1.], [1.], [2.5], [3.0]]
         expectedLabels = [0]*2 + [1] * 2
+       # print(at.incentive_df)
+        #print(expectedFeatures, "real",dataset_.features)
         assert((expectedFeatures == dataset_.features).all())
         assert((expectedLabels == dataset_.labels.ravel()).all())
 

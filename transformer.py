@@ -89,6 +89,7 @@ class AgentTransformer(Transformer):
         for task,x,y,c in zip(task_list,dataset.features, dataset.labels, cost):
             await task
             incentive, x_vec = task.result()
+            #print(incentive,x_vec)
 
             if incentive > 0 and not (x_vec == x).all():
         #        if x_['group'] == 0:
@@ -110,7 +111,7 @@ class AgentTransformer(Transformer):
                 features_.append(np.array(x))
                 labels_.append(y)
             i+=1
-
+            #print(features_)
         dataset_.features = features_
 
         #print("grp0: avg opt x",np.average(np.array(grp0)))
@@ -199,7 +200,6 @@ class AgentTransformer(Transformer):
             # modified x
             #x_ = {**x_obj, **p_obj}
             #x_mod_vec = dataset.obj_to_vector(x_)
-
             x_mod_vec[ft_changed_ind] = p
 
             # update opt if better
@@ -208,7 +208,7 @@ class AgentTransformer(Transformer):
             #benefit = await a.benefit([(x_mod_vec)])
         #    incentives.append([x_['x'], incentive, cost, benefit])
             if incentive > opt_incentive:
-                opt_incentive, opt_x = incentive, x_mod_vec
+                opt_incentive, opt_x = incentive, x_mod_vec.copy()
 
             if self.collect_incentive_data:
                 self.incentives.append(np.hstack(([uid], x,x_mod_vec,[incentive])))
@@ -226,6 +226,7 @@ class AgentTransformer(Transformer):
             #plt.plot(xs, benefit)
             #plt.show()
 
+        #print(x,"new opt",opt_x,"with inc", opt_incentive)
         return opt_incentive, opt_x
 
             # TODO: continious optimization
