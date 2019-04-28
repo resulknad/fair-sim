@@ -16,7 +16,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 group_attr = 'foreign_worker'
-mutable_attrs = ['credit_amount', 'month', 'savings', 'investment_as_income_percentage']
+mutable_attrs = ['credit_amount']#, 'month', 'savings', 'investment_as_income_percentage']
 
 def do_sim(learner,l,m):
     print("l",l,"m",m)
@@ -24,7 +24,7 @@ def do_sim(learner,l,m):
     M = m
     cp = lambda x_new, x: (pow(x_new/2.,2.)*(1-M)+abs(x_new-x)*M)*L #lambda x_new, x: x_new/2.+1*abs(x_new-x)/4.
     cn = lambda x_new, x: (pow((1-x_new)/2.,2.)*(1-M)+abs(x_new-x)*M)*L #lambda x_new, x: x_new/2.+1*abs(x_new-x)/4.
-    cost_fixed = lambda size: np.abs(np.random.normal(loc=.5,scale=0.75,size=size))
+    cost_fixed = lambda size: np.abs(np.random.normal(loc=.5,scale=1.0,size=size))
 
     g = GermanSimDataset(mutable_features=mutable_attrs,
             domains={k: 'auto' for k in mutable_attrs},
@@ -32,7 +32,7 @@ def do_sim(learner,l,m):
                          protected_attribute_names=[group_attr],
                          cost_fns={'number_of_credits': cn, 'credit_amount': cn, 'month': cn, 'savings': cp, 'investment_as_income_percentage': cp},
                          privileged_classes=[[1]],
-                         features_to_drop=['personal_status', 'sex', 'credit_history','other_debtors','purpose','status','skill_level', 'employment', 'property', 'housing', 'people_liable_for', 'installment_plans','telephone','residence_since', 'age'])
+                         features_to_drop=['personal_status', 'sex', 'age'])#, 'credit_history','other_debtors','purpose','status','skill_level', 'employment', 'property', 'housing', 'people_liable_for', 'installment_plans','telephone','residence_since', 'age'])
 
 
     privileged_groups = [{group_attr: 1}]
@@ -55,7 +55,7 @@ def do_sim(learner,l,m):
     #                 learner,
     #                 cost_fixed)
 
-    result_set = sim.start_simulation(runs=4)
+    result_set = sim.start_simulation(runs=1)
     return result_set
 
 def print_stats(result_set, name):
@@ -93,34 +93,32 @@ def print_stats(result_set, name):
     #plt.savefig(name+".png")
 
 result = []
-for l,m in itertools.product(np.linspace(0.1,0.1,1), np.linspace(0.5,0.5,1)):
+for l,m in itertools.product(np.linspace(0.2,0.2,1), np.linspace(0.9,0.9,1)):
     privileged_groups = [{group_attr: 1}]
     unprivileged_groups = [{group_attr: 0}]
 
-    print("No aff. action:")
-    rs = do_sim(LogisticLearner(), l, m)
-    result.append(print_stats(rs, "noaff"))
-    print("\n")
+    #print("No aff. action:")
+    #rs = do_sim(LogisticLearner(), l, m)
+    #result.append(print_stats(rs, "noaff"))
+    #print("\n")
 
     #print("Aff. action (DIY Stat. Parity enforcer)")
-    #rs = do_sim(StatisticalParityLogisticLearner(privileged_groups, unprivileged_groups, eps=0.001))
+    #rs = do_sim(StatisticalParityLogisticLearner(privileged_groups, unprivileged_groups, eps=0.001),l,m)
     #print_stats(rs, "postDIY")
 
     #print("Aff. action (Fairlearn learner)")
-    #rs = do_sim(FairLearnLearner(privileged_groups, unprivileged_groups))
+    #rs = do_sim(FairLearnLearner(privileged_groups, unprivileged_groups),l,m)
     #print_stats(rs, "in")
     #print("\n")
 
-
-
     #print("Aff. action (Reweighing)")
-    #rs = do_sim(ReweighingLogisticLearner(privileged_groups, unprivileged_groups))
+    #rs = do_sim(ReweighingLogisticLearner(privileged_groups, unprivileged_groups),l,m)
     #print_stats(rs, "pre")
     #print("\n")
 
     print("Aff. action (Reject Option)")
     rs = do_sim(RejectOptionsLogisticLearner(privileged_groups, unprivileged_groups),l,m)
-    result[len(result)-1] = result[len(result)-1] + print_stats(rs, "post")
+    #result[len(result)-1] = result[len(result)-1] + print_stats(rs, "post")
     print("\n")
 
 print(pd.DataFrame(result, columns=['name', 'l','m','mutdelt','statpar','eps','eps_std']*2).to_csv('output.csv'))
