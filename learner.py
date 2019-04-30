@@ -30,9 +30,10 @@ def _accuracy(h, dataset):
     return n_correct / len(dataset.labels.ravel())
 
 class RejectOptionsLogisticLearner(object):
-    def __init__(self, privileged_groups, unprivileged_groups):
+    def __init__(self, privileged_groups, unprivileged_groups, metric_name="Statistical parity difference"):
         self.privileged_group = privileged_groups
         self.unprivileged_group = unprivileged_groups
+        self.metric_name = metric_name
 
     def fit(self, dataset):
         reg = LogisticRegression(solver='liblinear',max_iter=1000000000, C=1000000000000000000000.0).fit(dataset.features, dataset.labels.ravel())
@@ -43,7 +44,7 @@ class RejectOptionsLogisticLearner(object):
         #print(dataset_p.scores)
         dataset_p.labels = np.array(list(map(lambda x: [x], reg.predict(dataset.features))))
 
-        ro = RejectOptionClassification(unprivileged_groups=self.unprivileged_group, privileged_groups=self.privileged_group,metric_name="Statistical parity difference")
+        ro = RejectOptionClassification(unprivileged_groups=self.unprivileged_group, privileged_groups=self.privileged_group,metric_name=self.metric_name)
         ro.fit(dataset, dataset_p)
 
         def h(x, single=True):
@@ -64,14 +65,109 @@ class RejectOptionsLogisticLearner(object):
     def accuracy(self, dataset):
         return _accuracy(self.h, dataset)
 
+class StatisticalParityFlipperLogisticLearner(object):
+    def __init__(self, privileged_group, unprivileged_group, exclude_protected=False):
+        self.privileged_group = privileged_group
+        self.unprivileged_group = unprivileged_group
+        self.ratio = 0.5
+        self.exclude_protected = exclude_protected
+
+    def fit(self, dataset):
+        def drop_prot(x):
+            return _drop_protected(dataset, x) if self.exclude_protected else x
+
+        reg = LogisticRegression(solver='lbfgs',max_iter=1000000000, C=1000000000000000000000.0).fit(drop_prot(dataset.features), dataset.labels.ravel())
+        self.h = reg
+        #print(sorted(list(zip(dataset.feature_names,reg.coef_[0])),key=lambda x: abs(x[1])))
+        #exit(1)
+
+        assert(len(self.privileged_group)==1)
+        assert(len(dataset.label_names) == 1)
+
+        #df = dataset.convert_to_dataframe()[0].drop(columns=dataset.label_names)
+
+        dataset.features = np.array(list(map(np.array, dataset.features)))
+        df = pd.DataFrame(data=dataset.features, columns=dataset.feature_names)
+        # priv count
+        #print(self.privileged_group[0])
+        n_p = len(_df_selection(df, self.privileged_group[0]).values)
+
+        # not priv count
+        n_np = len(_df_selection(df, self.unprivileged_group[0]).values)
+
+        data = _df_selection(df, self.privileged_group[0])
+        probs = list(map(lambda x: x[1], reg.predict_proba(drop_prot(data.values))))
+        n_p_y = (np.array(probs)>0.5).sum()
+
+        data = _df_selection(df, self.unprivileged_group[0])
+        assert(len(data.values)<=n_np)
+        probs = list(map(lambda x: x[1], reg.predict_proba(drop_prot(data.values))))
+        n_np_y = (np.array(probs)>0.5).sum()
+
+        stat_par_diff = n_p_y/n_p - n_np_y/n_np
+
+        # unprivileged should be unprivileged...
+
+        group_ft, unpriv_val = list(self.unprivileged_group[0].items())[0]
+        grp_i = dataset.feature_names.index(group_ft)
+
+        def decision_fn(x,single=True):
+            x = np.array(x)
+            y_pred = reg.predict(drop_prot(x))
+
+
+            def flip(grp_val, flip_from, flip_to, fraction):
+                # select all from group in x
+                grp_ind = x[:,grp_i] == grp_val
+                # find indices we predicted flip_from
+                label_ind = (y_pred == flip_from)
+                # flippable indices
+                flippable = (grp_ind & label_ind).nonzero()[0]
+                # shuffle
+                flippable = np.random.permutation(flippable)
+                # truncate
+                truncated_size = int(round(abs(stat_par_diff)*grp_ind.sum()*fraction))
+                #print(grp_val,"stat par diff is", stat_par_diff, " so we flip ",truncated_size)
+                flippable = flippable[:truncated_size]
+
+                # flip
+                y_pred[flippable] = [flip_to]* len(flippable)
+
+            if stat_par_diff > 0:
+                flip(unpriv_val, 0, 1, 1)
+                #flip(1-unpriv_val, 1, 0, .5)
+            else:
+                flip(unpriv_val, 1, 0, 1)
+                #flip(1-unpriv_val, 0, 1, .5)
+
+            #print("flipped ", len(flippable))
+
+
+            return y_pred.tolist()
+
+        #if stat_par_diff > 0:
+            #print("flipping up from 0 to 1 with pr", stat_par_diff/2., " for p from 1 to 0 with same pr")
+        #else:
+            #print("flipping up from 1 to 0 with pr", stat_par_diff/2., " for p from 0 to 1 with same pr")
+
+
+        self.h = decision_fn
+        return decision_fn #lambda x: 1 if np.add(reg.predict_proba(x)[1],x[grp_i]*boost > 0.5 else 0
+
+    def accuracy(self, dataset):
+        return _accuracy(self.h, dataset)
+
 class StatisticalParityLogisticLearner(object):
-    def __init__(self, privileged_group, unprivileged_group, eps):
+    def __init__(self, privileged_group, unprivileged_group, eps, exclude_protected=False):
         self.privileged_group = privileged_group
         self.unprivileged_group = unprivileged_group
         self.eps = eps
+        self.exclude_protected = exclude_protected
 
     def fit(self, dataset):
-        reg = LogisticRegression(solver='liblinear',max_iter=1000000000, C=1000000000000000000000.0).fit(dataset.features, dataset.labels.ravel())
+        def drop_prot(x):
+            return _drop_protected(dataset, x) if self.exclude_protected else x
+        reg = LogisticRegression(solver='liblinear',max_iter=1000000000, C=1000000000000000000000.0).fit(drop_prot(dataset.features), dataset.labels.ravel())
         self.h = reg
 
         assert(len(self.privileged_group)==1)
@@ -90,12 +186,12 @@ class StatisticalParityLogisticLearner(object):
 
         def stat_parity_diff(boost):
             data = _df_selection(df, self.privileged_group[0])
-            probs = list(map(lambda x: x[1], reg.predict_proba(data.values)))
+            probs = list(map(lambda x: x[1], reg.predict_proba(drop_prot(data.values))))
             n_p_y = (np.array(probs)>0.5).sum()
 
             data = _df_selection(df, self.unprivileged_group[0])
             assert(len(data.values)<=n_np)
-            probs = list(map(lambda x: x[1], reg.predict_proba(data.values)))
+            probs = list(map(lambda x: x[1], reg.predict_proba(drop_prot(data.values))))
             n_np_y = (np.array(np.add(probs,[boost]*len(probs)))>0.5).sum()
 
 
@@ -110,7 +206,7 @@ class StatisticalParityLogisticLearner(object):
         grp_i = dataset.feature_names.index(group_ft)
         def decision_fn(x,single=True):
             ys = []
-            probs = list(map(lambda x: x[1], reg.predict_proba(x)))
+            probs = list(map(lambda x: x[1], reg.predict_proba(drop_prot(x))))
             for x,p in zip(x,probs):
                 p_ = p + boost if x[grp_i] == unpriv_val else p
                 if p_ > 0.5:
@@ -183,20 +279,23 @@ class PrejudiceRemoverLearner(object):
 
 
 class LogisticLearner(object):
+    def __init__(self, exclude_protected=False):
+        self.exclude_protected = exclude_protected
+
     def fit(self, dataset):
-        #print(cross_val_score(MultinomialNB(), X, y, cv=5))
-        #exit()
-        #reg = MultinomialNB().fit(X,y)
-        reg = LogisticRegression(solver='liblinear',max_iter=1000000000, C=1000000000000000000000.0).fit(dataset.features, dataset.labels.ravel())
+        reg = LogisticRegression(solver='liblinear',max_iter=1000000000, C=1000000000000000000000.0).fit(self.drop_prot(dataset, dataset.features), dataset.labels.ravel())
 
         #print(sorted(list(zip(dataset.feature_names,reg.coef_[0])),key=lambda x: abs(x[1])))
         #exit(1)
         self.h = reg
 
-        return lambda x,single=True: reg.predict(x)[0] if single else reg.predict(x)
+        return lambda x,single=True: reg.predict(self.drop_prot(dataset, x))[0] if single else reg.predict(self.drop_prot(dataset, x))
+
+    def drop_prot(self, dataset, x):
+        return _drop_protected(dataset, np.array(x)) if self.exclude_protected else x
 
     def accuracy(self, dataset):
-        return self.h.score(dataset.features, dataset.labels.ravel())
+        return self.h.score(self.drop_prot(dataset, dataset.features), dataset.labels.ravel())
 
 
 class ReweighingLogisticLearner(object):
@@ -360,3 +459,8 @@ class CoateLouryLearner(object):
 
     def accuracy(self, dataset):
         return self.h.score(dataset.features, dataset.labels.ravel())
+
+def _drop_protected(dataset, features):
+    ft_names = dataset.protected_attribute_names
+    ft_indices = list(map(lambda x: not x in ft_names, dataset.feature_names))
+    return np.array(features)[:,ft_indices]

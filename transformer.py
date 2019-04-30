@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 
 from aif360.algorithms import Transformer
-from sklearn.neighbors import NearestNeighbors
+from sklearn.neighbors import KNeighborsClassifier
 import numpy as np
 import pandas as pd
 import asyncio
@@ -9,7 +9,9 @@ import uuid
 
 class AgentTransformer(Transformer):
 # this class is not thread safe
-    def __init__(self, agent_class, h, cost_distribution, scaler, no_neighbors=51, collect_incentive_data=True):
+    def __init__(self, agent_class, h, cost_distribution, scaler, no_neighbors=51, collect_incentive_data=False, avg_out_incentive=1):
+
+        self.avg_out_incentive = avg_out_incentive
         self.agent_class = agent_class
         self.h = h
         self.cost_distribution = cost_distribution
@@ -47,11 +49,11 @@ class AgentTransformer(Transformer):
         self.async_xs.append(x[0])
 
 # may now execute h, got enough xs
+
         if len(self.async_future_list) == self.async_no_wait:
             future_copy = self.async_future_list.copy()
             self.async_future_list = []
-
-            #print(self.async_xs)
+            #print(self.h)
             ys = self.h(self.async_xs, single=False)
             self.async_xs = []
             #print(ys)
@@ -68,11 +70,9 @@ class AgentTransformer(Transformer):
         if self.collect_incentive_data:
             self.incentives = []
 
-
-
         cost = self.cost_distribution(len(dataset.features))
 
-        dataset_ = dataset.copy()
+        dataset_ = dataset.copy(deepcopy=True)
         features_ = []
         labels_ = []
         changed_indices = []
@@ -82,7 +82,8 @@ class AgentTransformer(Transformer):
         grp1 = []
 
         task_list = []
-        self.async_no_wait = len(dataset.features)
+        self.async_no_wait = len(dataset.features) #* self.avg_out_incentive
+        #print("need to wait on ", self.async_no_wait)
         for x,y,c in zip(dataset.features, dataset.labels, cost):
             task_list.append(asyncio.create_task(self._optimal_x(dataset, x, y, c)))
 
@@ -137,24 +138,16 @@ class AgentTransformer(Transformer):
 
         unprotected_feature_indices = list(map(lambda x: not x in dataset.protected_attribute_names, dataset.feature_names))
         # fit KNN to unchanged (during simulation) datapoints
-        nbrs = NearestNeighbors(n_neighbors=self.no_neighbors).fit(dataset.features[:,unprotected_feature_indices])
-        _, indices = nbrs.kneighbors(X_changed[:,unprotected_feature_indices])
+        nbrs = KNeighborsClassifier(n_neighbors=self.no_neighbors, weights='distance').fit(dataset.features[:,unprotected_feature_indices], dataset.labels.ravel())
+        labels = nbrs.predict(X_changed[:,unprotected_feature_indices])
+        Y[changed_indices] = list(map(lambda x: [x],labels))
 
-        # for all changed datapoints
-        for i, x, neighbors in zip(range(len(X_changed)), X_changed,indices):
-            # get labels of nearest neighbors
-            neighbor_labels = np.array(dataset.labels)[neighbors]
-            unique, counts = np.unique(neighbor_labels, return_counts=True)
 
-            # set own label to the most common one among neighbors
-            _,label = sorted(zip(counts,unique), key=lambda x: x[0], reverse=True)[0]
-            Y_changed[i] = np.array([label])
-
-        Y[changed_indices] = Y_changed
-
+#        assert(Y.sum() >= dataset.labels.sum())
         # update labels (ground truth)
         dataset_.features = X
         dataset_.labels = np.array(Y.tolist())
+        print(dataset_.labels.sum(), " before: ", dataset.labels.sum())
         return dataset_
 
     def transform(self, dataset):
@@ -202,8 +195,12 @@ class AgentTransformer(Transformer):
             #x_mod_vec = dataset.obj_to_vector(x_)
             x_mod_vec[ft_changed_ind] = p
 
+            incentive = []
             # update opt if better
-            incentive = await a.incentive([x_mod_vec])
+            for k in range(self.avg_out_incentive):
+                incentive.append(a.incentive([x_mod_vec]))
+            incentive = await asyncio.gather(*incentive, return_exceptions=True)
+            incentive = np.mean(incentive)
             #cost = await a.cost([(x_mod_vec)])
             #benefit = await a.benefit([(x_mod_vec)])
         #    incentives.append([x_['x'], incentive, cost, benefit])

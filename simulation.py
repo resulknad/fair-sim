@@ -11,13 +11,15 @@ import re
 from transformer import AgentTransformer
 
 class Simulation(object):
-    def __init__(self, dataset, AgentCl, learner, cost_distribution, split=[0.5]):
+    def __init__(self, dataset, AgentCl, learner, cost_distribution, split=[0.5], collect_incentive_data=False, no_neighbors=51, avg_out_incentive=1):
         self.dataset = dataset
+        self.no_neighbors = no_neighbors
         self.cost_distribution = cost_distribution
         self.learner = learner
         self.split = split
         self.AgentCl = AgentCl
-
+        self.avg_out_incentive = avg_out_incentive
+        self.collect_incentive_data = collect_incentive_data
 
     def no_classes(self, dataset):
         return len(set(dataset.labels.ravel()))
@@ -38,6 +40,9 @@ class Simulation(object):
         for i in range(runs):
             res_list.append(self._simulate(scale))
         return SimulationResultSet(res_list,runs=runs)
+
+
+
 
     def _simulate(self, scale):
         self.scaler = MaxAbsScaler()
@@ -66,13 +71,16 @@ class Simulation(object):
         #rows = np.where(t[:,1] == 0.0)
         #result = t
 
-
         # learner moves
         h = self.learner.fit(train)
+
+        ft_names = dataset.protected_attribute_names
+        ft_indices = list(map(lambda x: not x in ft_names, dataset.feature_names))
+
         self.Y_predicted = h(dataset.features, False)
 
         # agents move
-        at = AgentTransformer(self.AgentCl, h, self.cost_distribution, self.scaler)
+        at = AgentTransformer(self.AgentCl, h, self.cost_distribution, self.scaler, collect_incentive_data=self.collect_incentive_data, no_neighbors=self.no_neighbors, avg_out_incentive=self.avg_out_incentive)
 
         dataset_ = at.transform(dataset)
         train_ = Simulation.dataset_from_matrix(np.hstack((dataset_.features[train_indices,:], dataset_.labels[train_indices])),dataset)
@@ -138,10 +146,12 @@ class SimulationResultSet:
         #self.acc_h_star_post = acc_h_star_post
         #self.incentives = at.incentive_df
 
-    def _pr(self, group):
+    def _pr(self, group, time='post', ft_name='credit_h'):
         pr_list = []
+
         for res in self.results:
-            count = count_df(res.df_new, [{'credit_h': 1, **group}, {'credit_h': 0, **group}])
+            df = res.df_new if time == 'post' else res.df
+            count = count_df(df, [{ft_name: 1, **group}, {ft_name: 0, **group}])
             total = count.sum()
             #print(count,total)
             pr, _ = count / total
@@ -150,11 +160,23 @@ class SimulationResultSet:
 
     # returns average of stat parity diff post sim
     def stat_parity_diff(self, unpriv, priv):
+        #up_pr = self._pr(unpriv,'pre', 'y')
+        #p_pr = self._pr(priv,'pre', 'y')
+        #print('(pre, y) up',up_pr,', p', p_pr)
+
+        #up_pr = self._pr(unpriv, 'pre')
+        #p_pr = self._pr(priv, 'pre')
+        #print('(pre) up',up_pr,', p', p_pr)
+
+        #up_pr = self._pr(unpriv,'post', 'y')
+        #p_pr = self._pr(priv,'post', 'y')
+        #print('(post, y) up',up_pr,', p', p_pr)
 
         up_pr = self._pr(unpriv)
         p_pr = self._pr(priv)
-        print(up_pr, p_pr)
-        return abs(up_pr-p_pr)
+        #print('(post, h) up',up_pr,', p', p_pr)
+
+        return (up_pr-p_pr)
 
 
     def feature_average(self, feature, selection_criteria={}):
