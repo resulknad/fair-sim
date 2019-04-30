@@ -193,7 +193,7 @@ class CoateLouryDataset(BinaryLabelDataset, SimMixin):
 class SimpleDataset(BinaryLabelDataset, SimMixin):
     def _generateData(self):
         threshold = 55
-        N = 100
+        N = 200
         def generateX(grp, loc):
             x = np.random.normal(loc=loc, scale=10., size=N)
             x_noisy = x + np.random.normal(loc=0, scale=20., size=N)

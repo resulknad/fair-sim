@@ -178,6 +178,18 @@ class SimulationResultSet:
 
         return (up_pr-p_pr)
 
+    def tpr(self, selection_criteria={}, truth_ft='y', pred_ft='credit_h', time='post'):
+        dfs = list(map(lambda r: r.df_new if time == 'post' else r.df, self.results))
+
+        crit_true = {**selection_criteria, truth_ft: 1}
+        crit_true_pos = {**selection_criteria, truth_ft: 1, pred_ft: 1}
+
+        n_true = list(map(lambda df: count_df(df, [crit_true]), dfs))
+        n_true_pos = list(map(lambda df: count_df(df, [crit_true_pos]), dfs))
+
+        tprs = np.divide(n_true_pos, n_true)
+        return np.mean(tprs), np.std(tprs)
+
 
     def feature_average(self, feature, selection_criteria={}):
         ft_values = list(reduce(lambda x,y: np.hstack((x,y)), map(lambda x: list(_df_selection(x.df, selection_criteria)[feature]), self.results)))
