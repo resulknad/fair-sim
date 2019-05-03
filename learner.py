@@ -15,13 +15,13 @@ from fairlearn.classred import expgrad
 from fairlearn.moments import DP
 from aif360.datasets import BinaryLabelDataset
 from scipy.optimize import minimize
-from simulation import Simulation
-
+import matplotlib.pyplot as plt
+from itertools import product
 from aif360.metrics import BinaryLabelDatasetMetric
 from scipy import optimize
-
 from plot import _df_selection
 from aif360.algorithms.postprocessing.reject_option_classification import RejectOptionClassification
+from simulation import Simulation
 
 # util to calc accuracy
 def _accuracy(h, dataset):
@@ -78,8 +78,6 @@ class StatisticalParityFlipperLogisticLearner(object):
 
         reg = LogisticRegression(solver='lbfgs',max_iter=1000000000, C=1000000000000000000000.0).fit(drop_prot(dataset.features), dataset.labels.ravel())
         self.h = reg
-        #print(sorted(list(zip(dataset.feature_names,reg.coef_[0])),key=lambda x: abs(x[1])))
-        #exit(1)
 
         assert(len(self.privileged_group)==1)
         assert(len(dataset.label_names) == 1)
@@ -335,34 +333,6 @@ class ReweighingLogisticLearner(object):
     def accuracy(self, dataset):
         return self.h.score(dataset.features, dataset.labels.ravel())
 
-
-
-#class AdversialDebiasingLogisticLearner(object):
-#    def __init__(self, **args):
-#        self.args = args
-#
-#    def fit(self, dataset):
-#        dataset.features = np.array(list(map(lambda x: np.array(x), dataset.features)))
-#        self.args['sess'] = tf.Session()
-#        self.args['scope_name'] = str(np.random.randint(1000000))
-#
-#        self.ad = AdversarialDebiasing(**self.args)
-#
-#        dataset_ = self.ad.fit_predict(dataset)
-#
-#
-#        self.args['sess'].close()
-#        tf.reset_default_graph()
-#
-#
-#        reg = LogisticRegression(solver='liblinear',max_iter=1000000000, C=1000000000000000000000.0).fit(dataset_.features, dataset_.labels.ravel())
-#        self.h = reg
-#
-#        return lambda x,single=True: reg.predict(x)[0] if single else reg.predict(x)
-#
-#    def accuracy(self, dataset):
-#        return self.h.score(dataset.features, dataset.labels.ravel())
-#
 class EqOddsPostprocessingLogisticLearner(object):
     def __init__(self, privileged_groups, unprivileged_groups):
         self.privileged_group = privileged_groups
@@ -410,67 +380,7 @@ class EqOddsPostprocessingLogisticLearner(object):
     def accuracy(self, dataset):
         return _accuracy(self.h, dataset)
 
-import matplotlib.pyplot as plt
-from itertools import product
 
-class CoateLouryLearner(object):
-    def __init__(self, f_u, f_q, x_u, x_q, pi_b, pi_w):
-        self.f_u, self.f_q, self.x_u, self.x_q, self.pi_b, self.pi_w = f_u, f_q, x_u, x_q, pi_b, pi_w
-
-    def fit(self, dataset):
-        # do multivariate root finding:
-        # 1. for b
-        # 2. for w
-        # 3. equal posterior probs.
-
-        def bayes_optimal_classifier(x):
-            # x = [theta_w, theta_b]
-
-            # returns optimization goal for opt classifier
-            def opt_fn_opt_classifier(pi):
-                return lambda theta: (self.f_u(theta) *((1.-pi)*self.x_u)/(pi*self.x_q)) - (self.f_q(theta) )
-
-            # returns optimization constraint for aff action
-            def affirmative_action(pi):
-
-                def fn(theta):
-                    return pi*(1.-integrate.quad(self.f_q,0,theta)[0])+(1.-pi)*(1-integrate.quad(self.f_u,0,theta)[0])
-
-                return fn
-            opt_classifier_w = opt_fn_opt_classifier(self.pi_w)
-            opt_classifier_b = opt_fn_opt_classifier(self.pi_b)
-            opt_aff_action = lambda theta_w, theta_b: affirmative_action(self.pi_w)(theta_w) - affirmative_action(self.pi_b)(theta_b)
-
-
-
-
-            return ([(opt_classifier_w(x[0])), (opt_classifier_b(x[1])), 0])#(opt_aff_action(x[0],x[1]))])
-
-
-
-        def bruce_force_minimization(fn, n, no):
-            min_val, min_x = [1000]*no, []
-            for x in product(*([list(np.linspace(0,1,500))]*n)):
-                if [abs(a) for a in min_val] >= [abs(a) for a in fn(x)] and fn(x)[0] <=0 and fn(x)[1]<=0 and abs(fn(x)[2]) < 0.5:
-                    min_val, min_x = fn(x), x
-            print(min_val)
-            return min_x
-
-        sol = bruce_force_minimization(bayes_optimal_classifier, 2, 3)
-        print(sol)
-
-
-
-        #print(cross_val_score(MultinomialNB(), X, y, cv=5))
-        #exit()
-        #reg = MultinomialNB().fit(X,y)
-        reg = LogisticRegression(solver='liblinear',max_iter=1000000000, C=1000000000000000000000.0).fit(dataset.features, dataset.labels.ravel())
-        self.h = reg
-
-        return lambda x,single=True: reg.predict(x)[0] if single else reg.predict(x)
-
-    def accuracy(self, dataset):
-        return self.h.score(dataset.features, dataset.labels.ravel())
 
 def _drop_protected(dataset, features):
     ft_names = dataset.protected_attribute_names

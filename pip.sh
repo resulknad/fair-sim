@@ -1,1 +1,0 @@
-sudo pacman -S python-pip python-setuptools  python-appdirs  python-cachecontrol  python-colorama                   python-distlib  python-distro  python-html5lib  python-lockfile python-msgpack  python-six  python-packaging  python-pep517  python-progress python-pytoml  python-retrying  python-requests  python-urllib3 python-webencodings
