@@ -16,6 +16,9 @@ class SimMixin:
         self.cost_fns = cost_fns
         self.discrete = discrete
 
+    def set_cost_fns(self, cost_fns):
+        self.cost_fns = cost_fns
+
     def infer_domain(self):
         # handle domain != list
         self.domains = {k: self._get_domain(k) if type(v) is not list else v for k,v in self.domains.items()}
@@ -191,20 +194,18 @@ class CoateLouryDataset(BinaryLabelDataset, SimMixin):
 
 
 class SimpleDataset(BinaryLabelDataset, SimMixin):
-    def _generateData(self):
-        threshold = 55
-        N = 200
+    def _generateData(self, means, N, threshold):
         def generateX(grp, loc):
-            x = np.random.normal(loc=loc, scale=10., size=N)
-            x_noisy = x + np.random.normal(loc=0, scale=20., size=N)
+            x = np.random.normal(loc=loc, scale=5, size=N)
+            x_noisy = x + np.random.normal(loc=0, scale=20, size=N)
 
             y = list(map(lambda x: 1 if x>threshold else 0, x_noisy))
 
             x = list(map(round, x))
 
             return np.vstack(([x],[[grp]*N],[y])).transpose()
-
-        X = np.vstack((generateX(1,60), generateX(0,45)))
+        print(means)
+        X = np.vstack((generateX(1,means[1]), generateX(0,means[0])))
         return pd.DataFrame(data=X, columns=['x', 'group', 'y'])
 
 
@@ -212,8 +213,11 @@ class SimpleDataset(BinaryLabelDataset, SimMixin):
         # remove arguments for sim_args constructor
         sim_args_names = ['mutable_features', 'domains', 'cost_fns', 'discrete']
         sim_args = {k: kwargs.pop(k, None) for k in sim_args_names}
+        self.means = kwargs.pop('means', [45,60])
+        self.N = kwargs.pop('N', 100)
+        self.threshold = kwargs.pop('threshold', 55)
 
-        df = self._generateData()
+        df = self._generateData(means=self.means, N=self.N, threshold=self.threshold)
 
         kwargs = {'df':df, 'label_names':['y'], 'protected_attribute_names':['group']}
 

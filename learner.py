@@ -195,12 +195,20 @@ class StatisticalParityLogisticLearner(object):
             n_np_y = (np.array(np.add(probs,[boost]*len(probs)))>0.5).sum()
 
 
-            stat_par_diff = n_np_y/n_np - n_p_y/n_p
+            stat_par_diff = n_np_y/n_np -  n_p_y/n_p
+            if boost == 0:
+                return stat_par_diff
+            else:
+                return stat_par_diff# - stat_parity_diff(0)/2.
             #print("Boost:",boost,n_np_y,"of", n_np, n_p_y,"of",n_p,stat_par_diff)
             return stat_par_diff
-
-        boost = optimize.bisect(stat_parity_diff, 0, 1, xtol=self.eps, disp=True)
-        #print("Boost:",boost)
+        try:
+            boost = optimize.bisect(stat_parity_diff, 0, 1, xtol=self.eps, disp=True)
+        except ValueError: #
+            print("couldnt find appropriate boost, dont boost")
+            boost = 0
+        #boost = 0.
+        print("Boost:",boost)
 
         group_ft, unpriv_val = list(self.unprivileged_group[0].items())[0]
         grp_i = dataset.feature_names.index(group_ft)
@@ -285,7 +293,7 @@ class LogisticLearner(object):
     def fit(self, dataset):
         reg = LogisticRegression(solver='liblinear',max_iter=1000000000, C=1000000000000000000000.0).fit(self.drop_prot(dataset, dataset.features), dataset.labels.ravel())
 
-        print(sorted(list(zip(dataset.feature_names,reg.coef_[0])),key=lambda x: abs(x[1])))
+        #print(sorted(list(zip(dataset.feature_names,reg.coef_[0])),key=lambda x: abs(x[1])))
         #exit(1)
         self.h = reg
 
@@ -316,9 +324,9 @@ class ReweighingLogisticLearner(object):
 
 
         reg = LogisticRegression(solver='liblinear',max_iter=1000000000, C=1000000000000000000000.0).fit(dataset_.features, dataset_.labels.ravel(), sample_weight=dataset_.instance_weights)
-        print("reweighted",sorted(list(zip(dataset.feature_names,reg.coef_[0])),key=lambda x: abs(x[1])))
+        #print("reweighted",sorted(list(zip(dataset.feature_names,reg.coef_[0])),key=lambda x: abs(x[1])))
         reg = LogisticRegression(solver='liblinear',max_iter=1000000000, C=1000000000000000000000.0).fit(dataset_.features, dataset_.labels.ravel())
-        print(sorted(list(zip(dataset.feature_names,reg.coef_[0])),key=lambda x: abs(x[1])))
+        #print(sorted(list(zip(dataset.feature_names,reg.coef_[0])),key=lambda x: abs(x[1])))
 
         self.h = reg
 

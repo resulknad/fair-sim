@@ -9,7 +9,7 @@ import uuid
 
 class AgentTransformer(Transformer):
 # this class is not thread safe
-    def __init__(self, agent_class, h, cost_distribution, scaler, no_neighbors=51, collect_incentive_data=False, avg_out_incentive=1):
+    def __init__(self, agent_class, h, cost_distribution, scaler, no_neighbors=51, collect_incentive_data=False, avg_out_incentive=1, cost_distribution_dep=None):
 
         self.avg_out_incentive = avg_out_incentive
         self.agent_class = agent_class
@@ -17,6 +17,7 @@ class AgentTransformer(Transformer):
         self.cost_distribution = cost_distribution
         self.no_neighbors = no_neighbors
         self.collect_incentive_data = collect_incentive_data
+        self.cost_distribution_dep = cost_distribution_dep
         self.incentives = []
 
 
@@ -70,7 +71,12 @@ class AgentTransformer(Transformer):
         if self.collect_incentive_data:
             self.incentives = []
 
-        cost = self.cost_distribution(len(dataset.features))
+        # fixed cost may be same for all instances
+        if self.cost_distribution_dep is None:
+            cost = self.cost_distribution(len(dataset.features))
+        else:
+        # or different depending on features (like group)
+            cost = np.array(list(map(self.cost_distribution_dep, dataset.features)))
 
         dataset_ = dataset.copy(deepcopy=True)
         features_ = []
