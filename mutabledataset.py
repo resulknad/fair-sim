@@ -208,7 +208,6 @@ class SimpleDataset(BinaryLabelDataset, SimMixin):
         X = np.vstack((generateX(1,means[1]), generateX(0,means[0])))
         return pd.DataFrame(data=X, columns=['x', 'group', 'y'])
 
-
     def __init__(self, *args, **kwargs):
         # remove arguments for sim_args constructor
         sim_args_names = ['mutable_features', 'domains', 'cost_fns', 'discrete']

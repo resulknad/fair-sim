@@ -6,6 +6,7 @@ import pandas as pd
 from sklearn.linear_model import LinearRegression
 from sklearn.linear_model import LogisticRegression
 from sklearn.naive_bayes import MultinomialNB
+from sklearn.ensemble import RandomForestClassifier
 from sklearn import svm
 from sklearn.model_selection import cross_val_score
 from aif360.algorithms.preprocessing import Reweighing
@@ -30,10 +31,11 @@ def _accuracy(h, dataset):
     return n_correct / len(dataset.labels.ravel())
 
 class RejectOptionsLogisticLearner(object):
-    def __init__(self, privileged_groups, unprivileged_groups, metric_name="Statistical parity difference"):
+    def __init__(self, privileged_groups, unprivileged_groups, metric_name="Statistical parity difference", abs_bound=0.05):
         self.privileged_group = privileged_groups
         self.unprivileged_group = unprivileged_groups
         self.metric_name = metric_name
+        self.abs_bound = abs_bound
 
     def fit(self, dataset):
         reg = LogisticRegression(solver='liblinear',max_iter=1000000000, C=1000000000000000000000.0).fit(dataset.features, dataset.labels.ravel())
@@ -44,7 +46,11 @@ class RejectOptionsLogisticLearner(object):
         #print(dataset_p.scores)
         dataset_p.labels = np.array(list(map(lambda x: [x], reg.predict(dataset.features))))
 
-        ro = RejectOptionClassification(unprivileged_groups=self.unprivileged_group, privileged_groups=self.privileged_group,metric_name=self.metric_name)
+        ro = RejectOptionClassification(unprivileged_groups=self.unprivileged_group,
+                privileged_groups=self.privileged_group,
+                metric_name=self.metric_name,
+                metric_ub=self.abs_bound,
+                metric_lb=-self.abs_bound)
         ro.fit(dataset, dataset_p)
 
         def h(x, single=True):
@@ -283,6 +289,41 @@ class PrejudiceRemoverLearner(object):
     def accuracy(self, dataset):
         return _accuracy(self.h, dataset)
 
+class RandomForestLearner(object):
+    def __init__(self, exclude_protected=False):
+        self.exclude_protected = exclude_protected
+
+    def fit(self, dataset):
+        reg = RandomForestClassifier(n_estimators=100, max_depth=10).fit(self.drop_prot(dataset, dataset.features), dataset.labels.ravel())
+
+        self.h = reg
+
+        return lambda x,single=True: reg.predict(self.drop_prot(dataset, x))[0] if single else reg.predict(self.drop_prot(dataset, x))
+
+    def drop_prot(self, dataset, x):
+        return _drop_protected(dataset, np.array(x)) if self.exclude_protected else x
+
+    def accuracy(self, dataset):
+        return self.h.score(self.drop_prot(dataset, dataset.features), dataset.labels.ravel())
+
+class MultinomialNBLearner(object):
+    def __init__(self, exclude_protected=False):
+        self.exclude_protected = exclude_protected
+
+    def fit(self, dataset):
+        reg = MultinomialNB().fit(self.drop_prot(dataset, dataset.features), dataset.labels.ravel())
+
+        #print(sorted(list(zip(dataset.feature_names,reg.coef_[0])),key=lambda x: abs(x[1])))
+        #exit(1)
+        self.h = reg
+
+        return lambda x,single=True: reg.predict(self.drop_prot(dataset, x))[0] if single else reg.predict(self.drop_prot(dataset, x))
+
+    def drop_prot(self, dataset, x):
+        return _drop_protected(dataset, np.array(x)) if self.exclude_protected else x
+
+    def accuracy(self, dataset):
+        return self.h.score(self.drop_prot(dataset, dataset.features), dataset.labels.ravel())
 
 class LogisticLearner(object):
     def __init__(self, exclude_protected=False):

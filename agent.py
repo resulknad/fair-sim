@@ -13,7 +13,7 @@ class RationalAgent:
         return await self.h(x_new)
 
     async def cost(self, x_new):
-        assert(self.cost_fixed>=0)
+        #assert(self.cost_fixed>=0)
         return self.cost_fixed + self.dataset.dynamic_cost(x_new, self.x)
 ##
     async def incentive(self, x_new):

@@ -71,8 +71,6 @@ def print_stats(result_set, name):
 privileged_groups = [{'group': 1}]
 unprivileged_groups = [{'group': 0}]
 
-
-
 print("Reject Options TPR")
 rs = do_sim(RejectOptionsLogisticLearner(privileged_groups, unprivileged_groups, metric_name='Equal opportunity difference'))
 print_stats(rs, "postRejOpTPR")
@@ -82,4 +80,3 @@ print("No aff. action")
 rs = do_sim(LogisticLearner(exclude_protected=True))
 print_stats(rs, "noaff")
 print("\n")
-

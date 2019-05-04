@@ -164,23 +164,11 @@ class SimulationResultSet:
 
     # returns average of stat parity diff post sim
     def stat_parity_diff(self, unpriv, priv):
-        #up_pr = self._pr(unpriv,'pre', 'y')
-        #p_pr = self._pr(priv,'pre', 'y')
-        #print('(pre, y) up',up_pr,', p', p_pr)
-
-        #up_pr = self._pr(unpriv, 'pre')
-        #p_pr = self._pr(priv, 'pre')
-        #print('(pre) up',up_pr,', p', p_pr)
-
-        #up_pr = self._pr(unpriv,'post', 'y')
-        #p_pr = self._pr(priv,'post', 'y')
-        #print('(post, y) up',up_pr,', p', p_pr)
-
         up_pr = self._pr(unpriv)
         p_pr = self._pr(priv)
-        #print('(post, h) up',up_pr,', p', p_pr)
 
-        return (up_pr-p_pr)
+        return abs(up_pr-p_pr)
+
 
     def tpr(self, selection_criteria={}, truth_ft='y', pred_ft='credit_h', time='post'):
         dfs = list(map(lambda r: r.df_new if time == 'post' else r.df, self.results))
@@ -227,8 +215,6 @@ class SimulationResult:
     # then move on to stat. parity implementation from aif360
     # then do in processing statistical parity
     # then pre processing statistical parity
-
-
 
     def __str__(self):
         attrs = vars(self)
