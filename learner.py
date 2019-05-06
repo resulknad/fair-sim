@@ -332,8 +332,8 @@ class LogisticLearner(object):
     def fit(self, dataset):
         reg = LogisticRegression(solver='liblinear',max_iter=1000000000, C=1000000000000000000000.0).fit(self.drop_prot(dataset, dataset.features), dataset.labels.ravel())
 
-        #print(sorted(list(zip(dataset.feature_names,reg.coef_[0])),key=lambda x: abs(x[1])))
-        #exit(1)
+        self.coefs = (sorted(list(zip(dataset.feature_names,reg.coef_[0])),key=lambda x: -abs(x[1])))
+
         self.h = reg
 
         return lambda x,single=True: reg.predict(self.drop_prot(dataset, x))[0] if single else reg.predict(self.drop_prot(dataset, x))
