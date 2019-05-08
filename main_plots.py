@@ -40,7 +40,15 @@ sns.set()
 
 # ## Parameters for simulation
 
+immutable = 'age'
 # +
+mutable_monotone_neg = ['month', 'credit_amount', 'status', 'investment_as_income_percentage', 'number_of_credits', 'people_liable_for']
+mutable_dontknow = ['residence_since']
+mutable_monotone_pos = ['savings']
+
+categorical = [] #['credit_history=A34', 'purpose=A48','has_checking_account', 'purpose=A41', 'other_debtors=A103', 'purpose=A46', 'purpose=A40', 'credit_history=A31', 'employment=A74', 'credit_history=A30', 'credit_history=A33', 'purpose=A410', 'installment_plans=A143', 'housing=A153', 'property=A121', 'telephone=A192', 'skill_level=A171', 'purpose=A44', 'purpose=A45', 'housing=A152', 'other_debtors=A102', 'employment=A75', 'employment=A71', 'purpose=A43', 'property=A124', 'property=A123', 'housing=A151', 'employment=A72', 'credit_history=A32', 'property=A122', 'telephone=A191', 'installment_plans=A142', 'skill_level=A172', 'purpose=A42', 'employment=A73', 'other_debtors=A101', 'skill_level=A173', 'purpose=A49', 'installment_plans=A141', 'skill_level=A174']
+
+
 mutable_attr = 'month'
 group_attr = 'age'
 priv_classes = [lambda x: x >= 25]
@@ -51,15 +59,21 @@ unprivileged_group = {group_attr: 0}
 cost_fixed = lambda size: np.abs(np.random.normal(loc=0,scale=0.5,size=size))
 # TODO: plot cost function for dataset
 
-M = 0.2
-L = 0.9
-# cp = lambda x_new, x: abs(x_new-x)
+C = 0.1
 
-data = GermanSimDataset(mutable_features=[mutable_attr],
-        domains={mutable_attr: 'auto'},
-                     discrete=[mutable_attr],
+c_pos = lambda x_new, x, rank: max(0, rank(x_new)-rank(x))
+c_neg = lambda x_new, x, rank: max(0, rank(x)-rank(x_new))
+c_cat = lambda x_new, x, rank: C
+
+all_mutable = mutable_monotone_pos + mutable_monotone_neg + mutable_dontknow + categorical
+print(len(all_mutable))
+data = GermanSimDataset(mutable_features=all_mutable,
+        domains={k: 'auto' for k in all_mutable},
+                     discrete=all_mutable,
                      protected_attribute_names=[group_attr],
-                     cost_fns={mutable_attr: cp},
+                     cost_fns={ **{a: c_pos for a in mutable_monotone_pos},
+                         **{a: c_neg for a in mutable_monotone_neg},
+                         **{a: c_cat for a in categorical}},
                      privileged_classes=priv_classes,
                      features_to_drop=['personal_status', 'sex', 'foreign_worker'])
 # -
@@ -88,9 +102,9 @@ display(pd.DataFrame(columns=['Feature', 'Coefficient LogReg'], data=l.coefs))
 
 # ## Cost function?
 
-rs = do_sim(RandomForestLearner(exclude_protected=True), collect_incentive_data=True)
-ax = sns.lineplot(x=mutable_attr, y="incentive",hue=group_attr,data=(rs.                      _avg_incentive(mutable_attr, group_attr)).reset_index())
-#plt.savefig(name+".png")
+rs = do_sim(RandomForestLearner(exclude_protected=True), collect_incentive_data=False)
+ax = sns.lineplot(x=mutable_attr, y="incentive",hue=group_attr,data=(rs.
+    _avg_incentive(mutable_attr, group_attr)).reset_index())
 plt.show()
 
 
@@ -126,6 +140,7 @@ plt.figure()
 sns.catplot(x="name", y=y_attr, hue="time", kind="bar",
             data=plot_data_df)
 plt.show()
+exit(1)
 
 
 # -

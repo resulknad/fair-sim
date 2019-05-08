@@ -163,5 +163,28 @@ class TestAgentTransformer(unittest.TestCase):
         assert((expectedFeatures == dataset_.features).all())
         assert((expectedLabels == dataset_.labels.ravel()).all())
 
+    def test_rank_based_dynamic_cost(self):
+        # should enforce that people
+        def cost_fn(x_new, x, rank_fn):
+            print(x_new, x, rank_fn)
+            return rank_fn(x)-rank_fn(x_new)
+
+        dataset = TestDataset(mutable_features=['x'],
+            domains={'x': 'auto'},
+            discrete=['x'],
+            cost_fns={'x': cost_fn}, protected_attribute_names=[])#'x': cost_lambda})
+        dataset.infer_domain()
+
+        h_all = lambda x: list(map(lambda x: 1. if x[0]>2 else 0.,x))
+        h = lambda x,single=True: h_all(x)[0] if single else h_all(x)
+        at = AgentTransformer(RationalAgent, h, lambda size: [0.0]*size, None, no_neighbors=1, collect_incentive_data=True)
+
+        dataset_ = at.transform(dataset)
+
+        expectedFeatures = [[3.], [3.], [3.], [3.]]
+        expectedLabels = [1] * 4
+        assert((expectedFeatures == dataset_.features).all())
+        assert((expectedLabels == dataset_.labels.ravel()).all())
+
 if __name__ == '__main__':
     unittest.main()

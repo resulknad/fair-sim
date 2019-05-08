@@ -1,7 +1,10 @@
 import matplotlib.pyplot as plt
+import time
+import traceback
 
 from aif360.algorithms import Transformer
 from sklearn.neighbors import KNeighborsClassifier
+from scipy.optimize import approx_fprime
 import numpy as np
 import pandas as pd
 import asyncio
@@ -9,9 +12,10 @@ import uuid
 
 class AgentTransformer(Transformer):
 # this class is not thread safe
-    def __init__(self, agent_class, h, cost_distribution, scaler, no_neighbors=51, collect_incentive_data=False, avg_out_incentive=1, cost_distribution_dep=None):
+    def __init__(self, agent_class, h, cost_distribution, scaler, no_neighbors=51, collect_incentive_data=False, avg_out_incentive=1, cost_distribution_dep=None, use_rank=True):
 
         self.avg_out_incentive = avg_out_incentive
+        self.use_rank = True
         self.agent_class = agent_class
         self.h = h
         self.cost_distribution = cost_distribution
@@ -153,7 +157,7 @@ class AgentTransformer(Transformer):
         # update labels (ground truth)
         dataset_.features = X
         dataset_.labels = np.array(Y.tolist())
-        print(dataset_.labels.sum(), " before: ", dataset.labels.sum())
+        #print(dataset_.labels.sum(), " before: ", dataset.labels.sum())
         return dataset_
 
     def transform(self, dataset):
@@ -166,14 +170,17 @@ class AgentTransformer(Transformer):
             dataset_ = loop.run_until_complete(task)
         except RuntimeError:
             dataset_ = asyncio.run(task)
+
         # create df for incentives
         ft_names_orig = list(map(lambda x: x+"_orig", dataset.feature_names))
-
 
         self.incentive_df = pd.DataFrame(data=self.incentives, columns=['uid'] + ft_names_orig + dataset.feature_names + ['incentive'], dtype=float)
         self.incentives=[]
 
         return dataset_
+
+    #async def _optimal_x(self, dataset, x, y, cost):
+        #scipy.optimize.approx_fprime
 
     async def _optimal_x(self, dataset, x, y, cost):
         uid = uuid.uuid4().hex
@@ -188,12 +195,11 @@ class AgentTransformer(Transformer):
         # iterate over all discrete permutations
         ft_names, permutations = dataset.discrete_permutations()
         ft_changed_ind = list(map(lambda y: dataset.feature_names.index(y), ft_names))
-        permutations = list(permutations)
         #incentives = []
-        i = 0
+        j = 0
         for p in permutations:
-            i+=1
-            #print(i,"out of", len(permutations))
+            #print(j)
+            j+=1
             #p_obj = {k:v for k,v in zip(ft_names,p)}
 
             # modified x
@@ -203,9 +209,16 @@ class AgentTransformer(Transformer):
 
             incentive = []
             # update opt if better
+
+
             for k in range(self.avg_out_incentive):
                 incentive.append(a.incentive([x_mod_vec]))
             incentive = await asyncio.gather(*incentive, return_exceptions=True)
+
+
+            for i in incentive:
+                if hasattr(i, '__traceback__'):
+                    traceback.print_tb(i.__traceback__)
             incentive = np.mean(incentive)
             #cost = await a.cost([(x_mod_vec)])
             #benefit = await a.benefit([(x_mod_vec)])

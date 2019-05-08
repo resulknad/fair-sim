@@ -11,7 +11,7 @@ import re
 from transformer import AgentTransformer
 
 class Simulation(object):
-    def __init__(self, dataset, AgentCl, learner, cost_distribution, split=[0.5], collect_incentive_data=False, no_neighbors=51, avg_out_incentive=1, cost_distribution_dep=None):
+    def __init__(self, dataset, AgentCl, learner, cost_distribution, split=[0.5], collect_incentive_data=False, no_neighbors=51, avg_out_incentive=1, cost_distribution_dep=None, use_rank=True):
         self.dataset = dataset
         self.no_neighbors = no_neighbors
         self.cost_distribution = cost_distribution
@@ -21,6 +21,7 @@ class Simulation(object):
         self.avg_out_incentive = avg_out_incentive
         self.collect_incentive_data = collect_incentive_data
         self.cost_distribution_dep = cost_distribution_dep
+        self.use_rank = use_rank
 
     def no_classes(self, dataset):
         return len(set(dataset.labels.ravel()))
@@ -81,7 +82,7 @@ class Simulation(object):
         self.Y_predicted = h(dataset.features, False)
 
         # agents move
-        at = AgentTransformer(self.AgentCl, h, self.cost_distribution, self.scaler, collect_incentive_data=self.collect_incentive_data, no_neighbors=self.no_neighbors, avg_out_incentive=self.avg_out_incentive, cost_distribution_dep=self.cost_distribution_dep)
+        at = AgentTransformer(self.AgentCl, h, self.cost_distribution, self.scaler, collect_incentive_data=self.collect_incentive_data, no_neighbors=self.no_neighbors, avg_out_incentive=self.avg_out_incentive, cost_distribution_dep=self.cost_distribution_dep, use_rank=self.use_rank)
 
         dataset_ = at.transform(dataset)
         train_ = Simulation.dataset_from_matrix(np.hstack((dataset_.features[train_indices,:], dataset_.labels[train_indices])),dataset)
@@ -107,11 +108,12 @@ class Simulation(object):
 
         # construct datasets for features
         # including predicted label
-        dataset.features = self.scaler.inverse_transform(dataset.features)
+        if scale:
+            dataset.features = self.scaler.inverse_transform(dataset.features)
         dataset_df = dataset.convert_to_dataframe(de_dummy_code=True)[0]
         dataset_df['credit_h'] = pd.Series(self.Y_predicted, index=dataset_df.index)
-
-        dataset_.features = self.scaler.inverse_transform(dataset_.features)
+        if scale:
+            dataset_.features = self.scaler.inverse_transform(dataset_.features)
         dataset_new_df = dataset_.convert_to_dataframe(de_dummy_code=True)[0]
         dataset_new_df['credit_h'] = pd.Series(self.Y_new_predicted, index=dataset_new_df.index)
 

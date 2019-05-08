@@ -6,6 +6,7 @@ import numpy as np
 from aif360.datasets import GermanDataset
 from aif360.datasets import StructuredDataset
 from aif360.datasets import BinaryLabelDataset
+from scipy.stats import percentileofscore
 
 
 class SimMixin:
@@ -22,6 +23,19 @@ class SimMixin:
     def infer_domain(self):
         # handle domain != list
         self.domains = {k: self._get_domain(k) if type(v) is not list else v for k,v in self.domains.items()}
+        self.ranks = self.rank_fns()
+
+    def rank_fns(self):
+        ranks = {}
+        for ft_name, x in zip(self.feature_names, np.array(self.features).transpose()):
+            #x_sorted = sorted(x.copy())
+            #x_ranks = rankdata(x_sorted)
+            #i = np.searchsorted(y, x_sorted)
+
+            #ranks = df['x'].rank(pct=True)
+            #rank = lambda v: ranks[(np.abs(x_scaled - v)).argmin()]
+            ranks[ft_name] = lambda y: percentileofscore(x, y, kind='weak')/100.
+        return ranks
 
     def _is_dummy_coded(self, ft):
         # fix this
@@ -76,7 +90,15 @@ class SimMixin:
         # cost fns are defined per feature, sum them up
         for new, old,ft in zip(x_new[0],x[0], self.feature_names):
             if ft in self.cost_fns:
-                cost += self.cost_fns[ft](new, old)
+                cost += self.cost_fns[ft](new, old, self.ranks[ft])
+
+        #        try:
+
+        #        except Exception:
+                    # dirty trick to avoid changing the testcases
+                    # TODO!
+        #            cost += self.cost_fns[ft](new, old)
+
         return cost
 
 
@@ -132,6 +154,8 @@ def custom_preprocessing(df):
     df['foreign_worker'] = df['foreign_worker'].replace({'A201':0, 'A202':1})
     df['savings'] = df['savings'].replace({'A61': 0, 'A62': 1, 'A63': 2, 'A64': 3, 'A65':5})
     df['credit_amount'] = (df['credit_amount']/max(df['credit_amount'])).apply(lambda x: round(x*8)/8.)
+    df['has_checking_account'] = df['month'].apply(lambda x: int(not x=='A14'))
+    df['status'] = df['status'].replace({'A11': 0, 'A12': 0.5, 'A13': 1, 'A14':0})
     df['month'] = (df['month']/max(df['month'])).apply(lambda x: round(x*8)/8.)
     df['credit'] = df['credit'].map(lambda x: 2-x)
     return df
@@ -144,7 +168,7 @@ class GermanSimDataset(GermanDataset, SimMixin):
 
         kwargs['custom_preprocessing'] = custom_preprocessing
         kwargs['metadata'] = default_mappings
-        kwargs['categorical_features'] = ['status', 'credit_history', 'purpose',
+        kwargs['categorical_features'] = ['credit_history', 'purpose',
                      'employment', 'other_debtors', 'property',
                      'installment_plans', 'housing', 'skill_level', 'telephone'
 ]
