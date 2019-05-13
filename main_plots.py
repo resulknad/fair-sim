@@ -119,31 +119,36 @@ l.fit(data)
 
 display(pd.DataFrame(columns=['Feature', 'Coefficient LogReg'], data=l.coefs))
 
-dist_plot_attr = 'investment_as_income_percentage'
+dist_plot_attr = 'month'
 data.infer_domain()
 fns = data.rank_fns()
 
-sample = np.linspace(0,5,100)
+sample = np.linspace(0,1,100)
 data_arr = list(map(fns[1][dist_plot_attr], sample))
 data_arr.extend(list(map(fns[1][dist_plot_attr], sample)))
 data_arr = np.array([np.hstack((sample,sample)), data_arr]).transpose()
 df = pd.DataFrame(data=data_arr, columns=['x', 'y'])
 ax = sns.lineplot(x='x', y="y",data=df)
+display(Markdown("### Distribution of " + dist_plot_attr))
 plt.show()
 # -
 
 # ## Cost function?
 
 rs = do_sim(LogisticLearner(exclude_protected=True), collect_incentive_data=False)
+display(Markdown("#### Feature averages per group LogReg protected excluded"))
 display(rs.feature_table([unprivileged_group, privileged_group]))
 #for grp_avg in (rs.results[0].df_new.groupby([group_attr]).mean().reset_index()):
 #    samples = np.linspace(min(data.domains[mutable_attr]), max(data.domains[mutable_attr]),50)
 #    incentive =
 
-ax = sns.lineplot(x=mutable_attr, y="incentive",hue=group_attr,data=(rs.
-    _avg_incentive(mutable_attr, group_attr)).reset_index())
-plt.show()
+# +
+#ax = sns.lineplot(x=mutable_attr, y="incentive",hue=group_attr,data=(rs.
+#    _avg_incentive(mutable_attr, group_attr)).reset_index())
+#plt.show()
 
+# +
+display(Markdown("#### distribution pre/post sim for " + mutable_attr))
 
 def merge_dfs(col, colval1, colval2, df1, df2):
     df1[col] = pd.Series([colval1] * len(df1.index), df1.index)
@@ -153,6 +158,7 @@ merged =merge_dfs('time', 'pre', 'post', rs.results[0].df, rs.results[0].df_new)
 sns.catplot(x=mutable_attr, hue="time", kind="count",
             data=merged)
 plt.show()
+# -
 
 # ## Comparison of different predictive methods
 
@@ -185,21 +191,21 @@ plt.show()
 
 # +
 
-metric_name = "gtdiff" #gtdiff, mutablediff
+metric_name = "statpar" #gtdiff, mutablediff
 
-def extract_metric(rs, metric_name="statpar"):
+def extract_metric(rs, metric_name="statpar", time='post'):
     if metric_name == "statpar":
-        ret = rs.stat_parity_diff(unprivileged_group, privileged_group)
+        ret = rs.stat_parity_diff(unprivileged_group, privileged_group, time=time )
         return ret
     elif metric_name == 'gtdiff':
         gt_label = data.label_names[0]
-        _, _, post_p_mean, _ = rs.feature_average(gt_label, privileged_group)
-        _, _, post_up_mean, _ = rs.feature_average(gt_label, unprivileged_group)
-        return abs(post_p_mean - post_up_mean)
+        pre_p_mean, _, post_p_mean, _ = rs.feature_average(gt_label, privileged_group)
+        pre_up_mean, _, post_up_mean, _ = rs.feature_average(gt_label, unprivileged_group)
+        return abs(post_p_mean - post_up_mean) if time == 'post' else abs(pre_p_mean - pre_up_mean)
     elif metric_name == 'mutablediff':
-        _, _, post_p_mean, _ = rs.feature_average(mutable_attr, privileged_group)
-        _, _, post_up_mean, _ = rs.feature_average(mutable_attr, unprivileged_group)
-        return abs(post_p_mean - post_up_mean)
+        pre_p_mean, _, post_p_mean, _ = rs.feature_average(mutable_attr, privileged_group)
+        pre_up_mean, _, post_up_mean, _ = rs.feature_average(mutable_attr, unprivileged_group)
+        return abs(post_p_mean - post_up_mean) if time == 'post' else abs(pre_p_mean - pre_up_mean)
 
     return None
 
@@ -232,12 +238,12 @@ plt.savefig("sighted_comp.png")
 
 # -
 
-# ## Notions of Fairness
+# # Notions of Fairness
 
 # +
 
 # Compare different notions of fairness
-y_attr = mutable_attr
+y_attr = 'credit'
 
 rs = do_sim(RejectOptionsLogisticLearner([privileged_group], [unprivileged_group]))
 plot_data = extract_avg_ft(rs, mutable_attr, "RO_StatPar")

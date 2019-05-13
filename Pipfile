@@ -20,6 +20,7 @@ jupyter = "*"
 seaborn = "*"
 fairlearn = "*"
 nest_asyncio = "*"
+jupytext = "*"
 
 [requires]
 python_version = "3.7"

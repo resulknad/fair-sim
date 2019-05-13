@@ -21,7 +21,6 @@ class SimMixin:
         self.cost_fns = cost_fns
 
     def infer_domain(self):
-        print("infer domains")
         # handle domain != list
         self.domains = {k: self._get_domain(k) if type(v) is not list else v for k,v in self.domains.items()}
         self.ranks = self.rank_fns()

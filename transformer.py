@@ -95,9 +95,9 @@ class AgentTransformer(Transformer):
             #print(np.mean(dict(zip(dataset.feature_names, min_domain))['investment_as_income_percentage']))
             incentive = a.incentive(X)
             if ((incentive-incentive_last) < 0.001).all():
-                print("Quit after ",i,"iterations")
                 break
 
+        print("Gradient ascend stopepd after ",i,"iterations (max 100)")
 
         X = dataset.enforce_dummy_coded(X)
         X_ = []

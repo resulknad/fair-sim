@@ -57,12 +57,11 @@ class Simulation(object):
                 break
         train_indices = list(map(int, train.instance_names))
         test_indices = list(map(int, test.instance_names))
-        print(train.features.shape, test.features.shape)
+        #print(train.features.shape, test.features.shape)
 
 
         self.train, self.test = train,test
         if scale:
-            print("scaling")
             train.features = self.scaler.fit_transform(train.features)
             test.features = self.scaler.transform(test.features)
             dataset.features = self.scaler.transform(dataset.features)
