@@ -27,7 +27,7 @@ from simulation import Simulation
 # util to calc accuracy
 def _accuracy(h, dataset):
     float_to_bool = lambda arr: np.array(list(map(lambda x: True if x == 1.0 else False, arr)))
-    n_correct = (float_to_bool(h(dataset.features, False)) & float_to_bool(dataset.labels.ravel())).sum()
+    n_correct = (float_to_bool(h(dataset.features)) & float_to_bool(dataset.labels.ravel())).sum()
     return n_correct / len(dataset.labels.ravel())
 
 class RejectOptionsLogisticLearner(object):
@@ -53,7 +53,7 @@ class RejectOptionsLogisticLearner(object):
                 metric_lb=-self.abs_bound)
         ro.fit(dataset, dataset_p)
 
-        def h(x, single=True):
+        def h(x):
             # add dummy labels as we're going to predict them anyway...
             x_with_labels = np.hstack((x, list(map(lambda x: [x], reg.predict(x)))))
             scores = list(map(lambda x:[x[1]],reg.predict_proba(x)))
@@ -64,9 +64,47 @@ class RejectOptionsLogisticLearner(object):
             dataset_ = ro.predict(dataset_)
             return dataset_.labels.ravel()
 
-        self.h = h
-        return h
+        def h_pr(x):
+            scores = np.array(list(map(lambda x:x[1], reg.predict_proba(x))))
+            orig_pred = reg.predict(x)
+            boosted_pred = h(x)
 
+            changed = (boosted_pred - orig_pred)
+
+            group_ft, unpriv_val = list(self.unprivileged_group[0].items())[0]
+            _, priv_val = list(self.privileged_group[0].items())[0]
+            grp_ind = dataset.feature_names.index(group_ft)
+
+
+            bool_increased = np.where(changed == 1)
+            if np.array(bool_increased).any():
+                max_increase = (0.5-scores[bool_increased]).max()
+                scores[x[:,grp_ind]==unpriv_val] += max_increase + 0.00001
+
+
+            bool_decreased = np.where(changed == -1)
+            if np.array(bool_decreased).any():
+                max_decrease = (scores[bool_decreased] - 0.5).max()
+                scores[x[:,grp_ind]==priv_val] -= max_decrease + 0.000001
+
+            boosted_pred = np.array(np.where(boosted_pred)[0])
+            score_pred = np.array(np.where(scores>=0.5)[0])
+            diff = np.setdiff1d(boosted_pred,score_pred)
+            #print("setdiff",diff)
+            #print(boosted_pred, score_pred)
+            assert(len(diff)==0)
+
+            return scores
+
+
+        self.h_pr = h_pr
+        self.h = h
+
+    def predict_proba(self, x):
+        return self.h_pr(x)
+
+    def predict(self, x):
+        return self.h(x)
 
     def accuracy(self, dataset):
         return _accuracy(self.h, dataset)
@@ -254,11 +292,17 @@ class FairLearnLearner(object):
         bc = expgrad(X, A, Y, reg, nu=2.9e-12, cons=DP()).best_classifier
         bc_binary = lambda x: (list(bc(x) > 0.5))
 
-        self.h = lambda x,single=True: bc_binary(x)[0] if single else bc_binary(x)
-        return self.h
+        self.bc = bc
+        self.bc_binary = bc_binary
+
+    def predict_proba(self, x):
+        return self.bc(x)
+
+    def predict(self, x):
+        return self.bc_binary(x)
 
     def accuracy(self, dataset):
-        return _accuracy(self.h, dataset)
+        return _accuracy(self.bc_binary, dataset)
 
 class PrejudiceRemoverLearner(object):
     def __init__(self, privileged_group, unprivileged_group):
@@ -294,11 +338,16 @@ class RandomForestLearner(object):
         self.exclude_protected = exclude_protected
 
     def fit(self, dataset):
+        self.dataset = dataset
         reg = RandomForestClassifier(n_estimators=100, max_depth=10).fit(self.drop_prot(dataset, dataset.features), dataset.labels.ravel())
 
         self.h = reg
 
-        return lambda x,single=True: reg.predict(self.drop_prot(dataset, x))[0] if single else reg.predict(self.drop_prot(dataset, x))
+    def predict(self, x):
+        return self.h.predict(self.drop_prot(self.dataset, x))
+
+    def predict_proba(self, x):
+        return list(map(lambda x: x[1],self.h.predict_proba(self.drop_prot(self.dataset, x))))
 
     def drop_prot(self, dataset, x):
         return _drop_protected(dataset, np.array(x)) if self.exclude_protected else x
@@ -311,13 +360,18 @@ class MultinomialNBLearner(object):
         self.exclude_protected = exclude_protected
 
     def fit(self, dataset):
+        self.dataset = dataset
         reg = MultinomialNB().fit(self.drop_prot(dataset, dataset.features), dataset.labels.ravel())
 
         #print(sorted(list(zip(dataset.feature_names,reg.coef_[0])),key=lambda x: abs(x[1])))
         #exit(1)
         self.h = reg
 
-        return lambda x,single=True: reg.predict(self.drop_prot(dataset, x))[0] if single else reg.predict(self.drop_prot(dataset, x))
+    def predict(self, x):
+        return self.h.predict(self.drop_prot(self.dataset, x))
+
+    def predict_proba(self, x):
+        return list(map(lambda x: x[1],self.h.predict_proba(self.drop_prot(self.dataset, x))))
 
     def drop_prot(self, dataset, x):
         return _drop_protected(dataset, np.array(x)) if self.exclude_protected else x
@@ -330,13 +384,19 @@ class LogisticLearner(object):
         self.exclude_protected = exclude_protected
 
     def fit(self, dataset):
+        self.dataset = dataset
         reg = LogisticRegression(solver='liblinear',max_iter=1000000000, C=1000000000000000000000.0).fit(self.drop_prot(dataset, dataset.features), dataset.labels.ravel())
 
         self.coefs = (sorted(list(zip(dataset.feature_names,reg.coef_[0])),key=lambda x: -abs(x[1])))
 
         self.h = reg
+        return None
 
-        return lambda x,single=True: reg.predict(self.drop_prot(dataset, x))[0] if single else reg.predict(self.drop_prot(dataset, x))
+    def predict(self, x):
+        return self.h.predict(self.drop_prot(self.dataset, x))
+
+    def predict_proba(self, x):
+        return list(map(lambda x: x[1],self.h.predict_proba(self.drop_prot(self.dataset, x))))
 
     def drop_prot(self, dataset, x):
         return _drop_protected(dataset, np.array(x)) if self.exclude_protected else x
@@ -369,7 +429,11 @@ class ReweighingLogisticLearner(object):
 
         self.h = reg
 
-        return lambda x,single=True: reg.predict(x)[0] if single else reg.predict(x)
+    def predict_proba(self, x):
+        return list(map(lambda x: x[1],self.h.predict_proba(x)))
+
+    def predict(self, x):
+        return self.h.predict(x)
 
     def accuracy(self, dataset):
         return self.h.score(dataset.features, dataset.labels.ravel())

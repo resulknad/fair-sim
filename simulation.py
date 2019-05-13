@@ -62,6 +62,7 @@ class Simulation(object):
 
         self.train, self.test = train,test
         if scale:
+            print("scaling")
             train.features = self.scaler.fit_transform(train.features)
             test.features = self.scaler.transform(test.features)
             dataset.features = self.scaler.transform(dataset.features)
@@ -74,15 +75,15 @@ class Simulation(object):
         #result = t
 
         # learner moves
-        h = self.learner.fit(train)
+        self.learner.fit(train)
 
         ft_names = dataset.protected_attribute_names
         ft_indices = list(map(lambda x: not x in ft_names, dataset.feature_names))
 
-        self.Y_predicted = h(dataset.features, False)
+        self.Y_predicted = self.learner.predict(dataset.features)
 
         # agents move
-        at = AgentTransformer(self.AgentCl, h, self.cost_distribution, self.scaler, collect_incentive_data=self.collect_incentive_data, no_neighbors=self.no_neighbors, avg_out_incentive=self.avg_out_incentive, cost_distribution_dep=self.cost_distribution_dep, use_rank=self.use_rank)
+        at = AgentTransformer(self.AgentCl, self.learner, self.cost_distribution, self.scaler, collect_incentive_data=self.collect_incentive_data, no_neighbors=self.no_neighbors, avg_out_incentive=self.avg_out_incentive, cost_distribution_dep=self.cost_distribution_dep, use_rank=self.use_rank)
 
         dataset_ = at.transform(dataset)
         train_ = Simulation.dataset_from_matrix(np.hstack((dataset_.features[train_indices,:], dataset_.labels[train_indices])),dataset)
@@ -94,7 +95,7 @@ class Simulation(object):
         # update changed features
 
         #dataset_ = dataset_from_matrix(np.hstack((np.vstack((train_.features, test_.features)), np.vstack((train_.labels, test_.labels)))), dataset)
-        self.Y_new_predicted = h(dataset_.features, False)
+        self.Y_new_predicted = self.learner.predict(dataset_.features)
 
         acc_h_post = self.learner.accuracy(test_)
         #print("Accuracy (h) post",acc_h_post)
@@ -165,9 +166,9 @@ class SimulationResultSet:
         return np.mean(pr_list)
 
     # returns average of stat parity diff post sim
-    def stat_parity_diff(self, unpriv, priv):
-        up_pr = self._pr(unpriv)
-        p_pr = self._pr(priv)
+    def stat_parity_diff(self, unpriv, priv, time='post'):
+        up_pr = self._pr(unpriv, time=time)
+        p_pr = self._pr(priv, time=time)
 
         return abs(up_pr-p_pr)
 
@@ -186,14 +187,29 @@ class SimulationResultSet:
 
 
     def feature_average(self, feature, selection_criteria={}):
-        ft_values = list(reduce(lambda x,y: np.hstack((x,y)), map(lambda x: list(_df_selection(x.df, selection_criteria)[feature]), self.results)))
-        ft_means = list(map(lambda x: np.mean(list(_df_selection(x.df, selection_criteria)[feature])), self.results))
-        ft_new_values = list(reduce(lambda x,y: np.hstack((x,y)), map(lambda x: list(_df_selection(x.df_new, selection_criteria)[feature]), self.results)))
-        ft_new_means = list(map(lambda x: np.mean(list(_df_selection(x.df_new, selection_criteria)[feature])), self.results))
+        ft_values = np.array(list(reduce(lambda x,y: np.hstack((x,y)), map(lambda x: list(_df_selection(x.df, selection_criteria)[feature]), self.results))))
+        if ft_values.dtype == np.float64:
+            ft_means = list(map(lambda x: np.mean(list(_df_selection(x.df, selection_criteria)[feature])), self.results))
+            ft_new_values = list(reduce(lambda x,y: np.hstack((x,y)), map(lambda x: list(_df_selection(x.df_new, selection_criteria)[feature]), self.results)))
+            ft_new_means = list(map(lambda x: np.mean(list(_df_selection(x.df_new, selection_criteria)[feature])), self.results))
+            return np.mean(ft_values),np.std(ft_means),np.mean(ft_new_values), np.std(ft_new_means)
+        else:
+            return 0,0,0,0
 
-        return np.mean(ft_values),np.std(ft_means),np.mean(ft_new_values), np.std(ft_new_means)
+
         #df = _df_selection(self.df, selection_criteria)
         #df_new = _df_selection(self.df_new, selection_criteria)
+
+    def feature_table(self, selection_criteria=[]):
+        data = []
+        for ft in list(self.results[0].df_new):
+            row = []
+            for sc in selection_criteria:
+                pre_mean, pre_std, post_mean, post_std = self.feature_average(ft, sc)
+                row = row + [str(round(pre_mean,2)) + " -> " + str(round(post_mean,2))]
+            data.append(row)
+
+        return pd.DataFrame(data=data, index=list(self.results[0].df_new))
 
     def __str__(self):
         return ' '.join(("Runs: ", str(self.runs), "\n",

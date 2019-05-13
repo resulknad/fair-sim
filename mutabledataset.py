@@ -21,20 +21,48 @@ class SimMixin:
         self.cost_fns = cost_fns
 
     def infer_domain(self):
+        print("infer domains")
         # handle domain != list
         self.domains = {k: self._get_domain(k) if type(v) is not list else v for k,v in self.domains.items()}
         self.ranks = self.rank_fns()
 
-    def rank_fns(self):
-        ranks = {}
-        for ft_name, x in zip(self.feature_names, np.array(self.features).transpose()):
-            #x_sorted = sorted(x.copy())
-            #x_ranks = rankdata(x_sorted)
-            #i = np.searchsorted(y, x_sorted)
+    def enforce_dummy_coded(self, X):
+        for k,v in StructuredDataset._parse_feature_names(self.feature_names)[0].items():
+            ft_indices = (list(map(lambda x: self.feature_names.index(k + '=' + x), v)))
+            max_index = np.argmax(X[:,ft_indices], axis=1)
 
-            #ranks = df['x'].rank(pct=True)
-            #rank = lambda v: ranks[(np.abs(x_scaled - v)).argmin()]
-            ranks[ft_name] = lambda y: percentileofscore(x, y, kind='weak')/100.
+            X[:, ft_indices] = 0
+            for i in range(len(max_index)):
+                X[i, ft_indices[max_index[i]]] = 1
+            for x in X:
+                assert(x[ft_indices].sum() == 1)
+
+        print(X.shape)
+        return X
+
+    def rank_fns(self):
+        X = self.features
+
+        assert(len(self.protected_attribute_names)==1)
+
+        group_attr = self.protected_attribute_names[0]
+        group_ind = self.feature_names.index(group_attr)
+        group_vals = list(set(X[:,group_ind]))
+        ranks = {}
+        for group_val in group_vals:
+            mask = (X[:,group_ind] == group_val)
+            for ft_name, vals in zip(self.feature_names, np.array(self.features).transpose()):
+                A = np.array(vals[mask])
+                pct = np.array(list(map(lambda x: np.count_nonzero(A <= x)/len(A), A)))
+
+                def create_rank_fn(A, pct):
+                    sorted_interp = np.array(sorted(list(zip(A, pct)), key=lambda x: x[0]))
+
+                    return lambda y: np.interp(y,sorted_interp[:,0],sorted_interp[:,1])
+
+                if ranks.get(group_val, None) is None:
+                    ranks[group_val] = {}
+                ranks[group_val][ft_name] = create_rank_fn(A, pct)
         return ranks
 
     def _is_dummy_coded(self, ft):
@@ -78,27 +106,32 @@ class SimMixin:
                 result_obj[k] = v
         return result_obj
 
-    def dynamic_cost(self, x_new, x):
+    def dynamic_cost(self, X_new, X):
+       # if len(X_new) == 1:
+       #     print(dict(zip(self.feature_names, X[0]))['age'])
+       #     print(dict(zip(self.feature_names, X_new[0]))['age'])
+        assert(len(self.protected_attribute_names)==1)
+        group_attr = self.protected_attribute_names[0]
+        group_ind = self.feature_names.index(group_attr)
+        group_vals = list(set(X[:,group_ind]))
+
+
+
+
+
+        cost = np.zeros(len(X), dtype=np.float64)
+
         # no cost fns defined
         if self.cost_fns is None or len(self.cost_fns) == 0:
-            return 0
+            return cost
 
-        assert(len(x_new)==1)
-        assert(len(x)==1)
-        cost = 0.0
-
-        # cost fns are defined per feature, sum them up
-        for new, old,ft in zip(x_new[0],x[0], self.feature_names):
+        for x_new, x, ft in zip(X_new.transpose(), X.transpose(), self.feature_names):
+            # cost fns are defined per feature, sum them up
             if ft in self.cost_fns:
-                cost += self.cost_fns[ft](new, old, self.ranks[ft])
-
-        #        try:
-
-        #        except Exception:
-                    # dirty trick to avoid changing the testcases
-                    # TODO!
-        #            cost += self.cost_fns[ft](new, old)
-
+                for group_val in group_vals:
+                    mask = (X[:,group_ind] == group_val)
+                    cost_inc = self.cost_fns[ft](x_new[mask], x[mask], self.ranks[group_val][ft])
+                    cost[mask] += cost_inc
         return cost
 
 
@@ -237,7 +270,7 @@ class SimpleDataset(BinaryLabelDataset, SimMixin):
         sim_args_names = ['mutable_features', 'domains', 'cost_fns', 'discrete']
         sim_args = {k: kwargs.pop(k, None) for k in sim_args_names}
         self.means = kwargs.pop('means', [45,60])
-        self.N = kwargs.pop('N', 100)
+        self.N = kwargs.pop('N', 1000)
         self.threshold = kwargs.pop('threshold', 55)
 
         df = self._generateData(means=self.means, N=self.N, threshold=self.threshold)

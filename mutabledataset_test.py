@@ -33,8 +33,8 @@ class TestAgent:
 
 class TestDataset(BinaryLabelDataset, SimMixin):
     def _generateData(self):
-        data = [[0.5,0], [0.5,0], [1,1], [1,1]]
-        return pd.DataFrame(data=data, columns=['x', 'y'])
+        data = [[0.5,0,0],[2,1,1],[1,0,1], [1,0,1], [0.5,0,0]]
+        return pd.DataFrame(data=data, columns=['x', 'group', 'y'])
 
     def __init__(self, *args, **kwargs):
         # remove arguments for sim_args constructor
@@ -49,16 +49,16 @@ class TestDataset(BinaryLabelDataset, SimMixin):
         SimMixin.__init__(self, **sim_args)
 
 
-class TestSimulation(unittest.TestCase):
+class TestMutableDataset(unittest.TestCase):
     def test_rank_fns(self):
         dataset = TestDataset(mutable_features=['x'],
             domains={'x': 'auto'},
             discrete=['x'],
-            cost_fns={}, protected_attribute_names=[])
+            cost_fns={}, protected_attribute_names=['group'])
         dataset.infer_domain()
         fns = dataset.rank_fns()
-
-        self.assertEqual(list(map(fns['x'], np.linspace(0,1,10))), [0.0, 0.0, 0.0, 0.0, 0.0, .5, .5, .5, .5, 1.0])
+        print(list(map(fns[0]['x'], np.linspace(0,1,10))))
+        self.assertEqual(list(map(fns[0]['x'], np.linspace(0,1,10))), [0.5, 0.5, 0.5, 0.5, 0.5, 0.5555555555555556, 0.6666666666666666, 0.7777777777777777, 0.8888888888888888, 1.0])
 
 if __name__ == '__main__':
     unittest.main()

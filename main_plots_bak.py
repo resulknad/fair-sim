@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # ---
 # jupyter:
 #   jupytext:
@@ -13,13 +14,13 @@
 # ---
 
 # +
-# %matplotlib inline
-# %load_ext autoreload
-# %autoreload 2
+%matplotlib inline
+import nest_asyncio
+nest_asyncio.apply()
 
 from mutabledataset import GermanSimDataset
 from sklearn.preprocessing import MaxAbsScaler
-from agent import RationalAgent, RationalAgentOrig
+from agent import RationalAgent
 from simulation import Simulation
 from learner import LogisticLearner
 import plot
@@ -36,66 +37,42 @@ import seaborn as sns
 from numpy.random import normal
 
 sns.set()
+
 # -
 
 # ## Parameters for simulation
 
 # +
 
-immutable = ['age']
-
-mutable_monotone_neg = ['month', 'credit_amount', 'status', 'investment_as_income_percentage', 'number_of_credits', 'people_liable_for']
-mutable_dontknow = ['residence_since']
-mutable_monotone_pos = ['savings']
-
-categorical = ['credit_history=A34', 'purpose=A48','has_checking_account', 'purpose=A41', 'other_debtors=A103', 'purpose=A46', 'purpose=A40', 'credit_history=A31', 'employment=A74', 'credit_history=A30', 'credit_history=A33', 'purpose=A410', 'installment_plans=A143', 'housing=A153', 'property=A121', 'telephone=A192', 'skill_level=A171', 'purpose=A44', 'purpose=A45', 'housing=A152', 'other_debtors=A102', 'employment=A75', 'employment=A71', 'purpose=A43', 'property=A124', 'property=A123', 'housing=A151', 'employment=A72', 'credit_history=A32', 'property=A122', 'telephone=A191', 'installment_plans=A142', 'skill_level=A172', 'purpose=A42', 'employment=A73', 'other_debtors=A101', 'skill_level=A173', 'purpose=A49', 'installment_plans=A141', 'skill_level=A174']
-
-
-mutable_attr = 'savings'
+mutable_attr = 'month'
 group_attr = 'age'
 priv_classes = [lambda x: x >= 25]
 
 privileged_group = {group_attr: 1}
 unprivileged_group = {group_attr: 0}
-DefaultAgent = RationalAgentOrig #RationalAgent, RationalAgentOrig (approx b(x) = h(x))
 
-cost_fixed = lambda size: np.abs(np.random.normal(loc=0.5,scale=0.5,size=size))
+cost_fixed = lambda size: np.abs(np.random.normal(loc=0,scale=0.5,size=size))
 # TODO: plot cost function for dataset
 
-C = 0.1
+M = 0.2
+L = 0.9
+cp = lambda x_new, x: (pow(x_new/2.,2.)*(1-M)+abs(x_new-x)*M)*L
 
-all_mutable = mutable_monotone_pos + mutable_monotone_neg + mutable_dontknow + categorical
-c_pos = lambda x_new, x, rank: np.clip((rank(x_new)-rank(x))/len(all_mutable), 0., None)
-c_neg = lambda x_new, x, rank: np.clip((rank(x)-rank(x_new))/len(all_mutable), 0., None)
-c_cat = lambda x_new, x, rank: (C/len(all_mutable))
-c_immutable = lambda x_new, x, rank: np.abs(x_new-x)*np.nan_to_num(float('inf'))
-
-
-print(len(all_mutable))
-
-
-
+data = GermanSimDataset(mutable_features=[mutable_attr],
+        domains={mutable_attr: 'auto'},
+                     discrete=[mutable_attr],
+                     protected_attribute_names=[group_attr],
+                     cost_fns={mutable_attr: cp},
+                     privileged_classes=priv_classes,
+                     features_to_drop=['personal_status', 'sex', 'foreign_worker'])
 # -
 
-# ## Common simulation code
+# ## Common simulation call
 
 # +
-
-def dataset():
-    return GermanSimDataset(mutable_features=all_mutable,
-            domains={k: 'auto' for k in all_mutable},
-                         discrete=all_mutable,
-                         protected_attribute_names=[group_attr],
-                         cost_fns={ **{a: c_pos for a in mutable_monotone_pos},
-                             **{a: c_neg for a in mutable_monotone_neg},
-                             **{a: c_cat for a in categorical},
-                             **{a: c_immutable for a in immutable}},
-                         privileged_classes=priv_classes,
-                         features_to_drop=['personal_status', 'sex', 'foreign_worker'])
 def do_sim(learner, cost_fixed=cost_fixed, cost_fixed_dep=None, collect_incentive_data=False):
-    data = dataset()
     sim = Simulation(data,
-                     DefaultAgent,
+                     RationalAgent,
                      learner,
                      cost_fixed if cost_fixed_dep is None else None,
                      collect_incentive_data=collect_incentive_data,
@@ -106,53 +83,30 @@ def do_sim(learner, cost_fixed=cost_fixed, cost_fixed_dep=None, collect_incentiv
 
     result_set = sim.start_simulation(runs=1)
     return result_set
-
 # -
 
-# ## LogReg feature coefficients
+# ## Which feature?
 
 # +
 
-data = dataset()
 l = LogisticLearner()
 l.fit(data)
-
 display(pd.DataFrame(columns=['Feature', 'Coefficient LogReg'], data=l.coefs))
 
-dist_plot_attr = 'investment_as_income_percentage'
-data.infer_domain()
-fns = data.rank_fns()
-
-sample = np.linspace(0,5,100)
-data_arr = list(map(fns[1][dist_plot_attr], sample))
-data_arr.extend(list(map(fns[1][dist_plot_attr], sample)))
-data_arr = np.array([np.hstack((sample,sample)), data_arr]).transpose()
-df = pd.DataFrame(data=data_arr, columns=['x', 'y'])
-ax = sns.lineplot(x='x', y="y",data=df)
-plt.show()
 # -
 
 # ## Cost function?
 
-rs = do_sim(LogisticLearner(exclude_protected=True), collect_incentive_data=False)
-display(rs.feature_table([unprivileged_group, privileged_group]))
-#for grp_avg in (rs.results[0].df_new.groupby([group_attr]).mean().reset_index()):
-#    samples = np.linspace(min(data.domains[mutable_attr]), max(data.domains[mutable_attr]),50)
-#    incentive =
+# +
 
-ax = sns.lineplot(x=mutable_attr, y="incentive",hue=group_attr,data=(rs.
-    _avg_incentive(mutable_attr, group_attr)).reset_index())
+rs = do_sim(LogisticLearner(exclude_protected=True))
+ax = sns.lineplot(x=mutable_attr, y="incentive",hue=group_attr,data=(rs.                      _avg_incentive(mutable_attr, group_attr)).reset_index())
+#plt.savefig(name+".png")
 plt.show()
 
+# -
 
-def merge_dfs(col, colval1, colval2, df1, df2):
-    df1[col] = pd.Series([colval1] * len(df1.index), df1.index)
-    df2[col] = pd.Series([colval2] * len(df2.index), df2.index)
-    return pd.concat((df1, df2))
-merged =merge_dfs('time', 'pre', 'post', rs.results[0].df, rs.results[0].df_new)
-sns.catplot(x=mutable_attr, hue="time", kind="count",
-            data=merged)
-plt.show()
+
 
 # ## Comparison of different predictive methods
 
@@ -178,14 +132,13 @@ sns.catplot(x="name", y=y_attr, hue="time", kind="bar",
             data=plot_data_df)
 plt.show()
 
-
 # -
 
 # ## Color-sighted vs. color-blind
 
 # +
 
-metric_name = "gtdiff" #gtdiff, mutablediff
+metric_name = "statpar" #gtdiff, mutablediff
 
 def extract_metric(rs, metric_name="statpar"):
     if metric_name == "statpar":
@@ -265,8 +218,6 @@ learners = [("pre", ReweighingLogisticLearner([privileged_group], [unprivileged_
     ("post",RejectOptionsLogisticLearner([privileged_group], [unprivileged_group]))]
 
 y_attr = mutable_attr
-y_attr = 'credit'
-
 for name, l in learners:
     rs = do_sim(l)
     plot_data += extract_avg_ft(rs, mutable_attr, name)
@@ -278,16 +229,13 @@ sns.catplot(x="name", y=y_attr, hue="time", kind="bar",
             data=plot_data_df)
 plt.show()
 
-# split for groups
-# 1. section 2.1 for cost function
-# 2. cost function as distance, only within group (immutable)
 # -
 
 # ## Time of Intervention
 
 # +
 
-metric_name = 'statpar' # statpar, gtdiff
+metric_name = 'mutablediff' # statpar
 subsidies = np.linspace(0,1,4)
 learner = LogisticLearner(exclude_protected=True)
 
@@ -315,6 +263,3 @@ plt.show()
 #for rs in result_sets:
 #    ax = sns.lineplot(x=mutable_attr, y="incentive",hue=group_attr,data=(rs.                     _avg_incentive(mutable_attr, group_attr)).reset_index())
 #    plt.show()
-# -
-
-

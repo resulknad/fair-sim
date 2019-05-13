@@ -4,6 +4,7 @@ from mutabledataset import SimMixin, GermanSimDataset
 from learner import _accuracy
 from simulation import Simulation
 import pandas as pd
+import numpy as np
 
 class TestLearner(object):
     def fit(self, dataset):
@@ -13,26 +14,33 @@ class TestLearner(object):
         self.h = h
         return h
 
+    def predict(self, X):
+        res = list(map(lambda x: int(x[0]<1), X))
+        return res
+
+    def predict_proba(self, X):
+        return np.clip(np.interp(X[:,0], self.X, self.y),None,0.51)
+
     def accuracy(self, dataset):
-        return _accuracy(self.h, dataset)
+        return _accuracy(self.predict, dataset)
 
 class TestAgent:
     def __init__(self, *args, **kwargs):
         return
 
-    async def incentive(self, x_new):
+    def incentive(self, x_new):
+        return np.zeros(len(x_new))
+
+    def cost(self, x_new):
         return 0
 
-    async def cost(self, x_new):
-        return 0
-
-    async def benefit(self, x_new):
+    def benefit(self, x_new):
         return 0
 
 class TestDataset(BinaryLabelDataset, SimMixin):
     def _generateData(self):
-        data = [[0.5,0], [0.5,0], [1,1], [1,1]]
-        return pd.DataFrame(data=data, columns=['x', 'y'])
+        data = [[0.5,0,0], [0.5,0,0], [1,0,1], [1,0,1]]
+        return pd.DataFrame(data=data, columns=['x','group', 'y'])
 
     def __init__(self, *args, **kwargs):
         # remove arguments for sim_args constructor
@@ -53,7 +61,7 @@ class TestSimulation(unittest.TestCase):
         dataset = TestDataset(mutable_features=['x'],
             domains={'x': 'auto'},
             discrete=['x'],
-            cost_fns={}, protected_attribute_names=[])
+            cost_fns={}, protected_attribute_names=['group'])
         dataset.infer_domain()
 
         sim = Simulation(dataset,

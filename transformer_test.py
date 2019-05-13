@@ -3,6 +3,7 @@ from aif360.datasets import BinaryLabelDataset
 from mutabledataset import SimMixin
 from transformer import AgentTransformer
 from agent import RationalAgent
+import numpy as np
 import pandas as pd
 
 class TestGroupDataset(BinaryLabelDataset, SimMixin):
@@ -45,146 +46,40 @@ class TestDataset(BinaryLabelDataset, SimMixin):
         SimMixin.__init__(self, **sim_args)
 
 
+class TestLearner:
+    def __init__(self, X, y):
+        self.X = X
+        self.y = y
+
+    def predict(self, X):
+        return self.predict_proba(X)
+
+    def predict_proba(self, X):
+        return np.clip(np.interp(X[:,0], self.X, self.y),None,0.51)
+
 class TestAgentTransformer(unittest.TestCase):
-#    def setUp(self):
-# construct a simulatable dataset
-# use rational agent / override specific methods...
-#        print("Set up")
-
-#    def tearDown(self):
-#        print("tear down")
-
-    def test_auto_domain(self):
-        dataset = TestDataset(mutable_features=['x'],
-            domains={'x': 'auto'},
-            discrete=['x'],
-            cost_fns={}, protected_attribute_names=[])#'x': cost_lambda})
-        dataset.infer_domain()
-
-        ft, perms = dataset.discrete_permutations()
-        self.assertEqual(ft, ['x'])
-        self.assertEqual(sorted(list(perms)), sorted([(1.0,),(1.5,),(2.5,),(3.0,)]))
 
     def test_zero_fixed_cost(self):
-        dataset = TestDataset(mutable_features=['x'],
-            domains={'x': 'auto'},
-            discrete=['x'],
-            cost_fns={}, protected_attribute_names=[])#'x': cost_lambda})
-        dataset.infer_domain()
-        h_all = lambda x: list(map(lambda x: 1 if x[0]>2 else 0,x))
-        h = lambda x,single=True: h_all(x)[0] if single else h_all(x)
-        at = AgentTransformer(RationalAgent, h, lambda size: [0]*size, None, no_neighbors=1)
+        # this tests whether group is included in KNN (shouldnt with below def of cost fn)
+        # and if KNN really takes the closest neighbor
+        # and the clipped predict_proba which incentivizes people not to move above the boundary
+        for neighbors in [1,2]:
+            dataset = TestGroupDataset(mutable_features=['x'],
+                domains={'x': 'auto'},
+                discrete=['x'],
+                cost_fns={
+                    'group': lambda x_new, x, rank: np.abs(x_new-x)*np.nan_to_num(float('inf')),
+                    'x': lambda x_new, x, _: np.abs(x_new - x)/100.}, protected_attribute_names=['group'])#'x': cost_lambda})
+            dataset.infer_domain()
 
-        dataset_ = at.transform(dataset)
-        expectedFeatures = [[2.5], [2.5], [2.5], [2.5]]
-        expectedLabels = [1] * 4
-        #print("expected", expectedFeatures, "reality", dataset_.features)
-        assert((expectedFeatures == dataset_.features).all())
-        assert((expectedLabels == dataset_.labels.ravel()).all())
+            at = AgentTransformer(RationalAgent, TestLearner([0,2,3],[0,0.51,1]), lambda size: [0]*size, None, no_neighbors=neighbors)
 
-    def test_group_not_included_in_knn(self):
-        dataset = TestGroupDataset(mutable_features=['x'],
-            domains={'x': 'auto'},
-            discrete=['x'],
-            cost_fns={'x':lambda x_new, x: 0 if abs(abs(x_new-x)-0.2)<0.001 else 1.1}, protected_attribute_names=['group'])
+            dataset_ = at.transform(dataset)
+            expectedFeatures = [[2.1, 0.], [2.1, 0.], [2.1, 1.], [3, 1.]]
+            expectedLabels = [1] * 2 + [0,1]
+            assert((expectedFeatures == dataset_.features).all())
+            assert((expectedLabels == dataset_.labels.ravel()).all())
 
-        dataset.infer_domain()
-        h = lambda x,single=True: ([1.]*len(x))
-        print(h([1,2,3]))
-        at = AgentTransformer(RationalAgent, h, lambda size: [0]*size, None, no_neighbors=1)
-
-        dataset_ = at.transform(dataset)
-        expectedLabels = [0,0,1,1]
-        assert((expectedLabels == dataset_.labels.ravel()).all())
-
-    def test_fixed_cost_too_high(self):
-        dataset = TestDataset(mutable_features=['x'],
-            domains={'x': 'auto'},
-            discrete=['x'],
-            cost_fns={}, protected_attribute_names=[])#'x': cost_lambda})
-        dataset.infer_domain()
-        h_all = lambda x: list(map(lambda x: 1 if x[0]>2 else 0,x))
-        h = lambda x,single=True: h_all(x)[0] if single else h_all(x)
-        at = AgentTransformer(RationalAgent, h, lambda size: [1.1]*size, None, no_neighbors=1)
-
-        dataset_ = at.transform(dataset)
-
-        expectedFeatures = [[1.], [1.5], [2.5], [3.0]]
-        expectedLabels = [0]*2 + [1] * 2
-        assert((expectedFeatures == dataset_.features).all())
-        assert((expectedLabels == dataset_.labels.ravel()).all())
-
-    def test_dynamic_cost(self):
-        # should enforce that y=0 manipulate to 1. the others remain
-        def cost_fn(x_new, x):
-            if x>2:
-                return 1
-            return 0 if x_new == 1. else 10
-
-        dataset = TestDataset(mutable_features=['x'],
-            domains={'x': 'auto'},
-            discrete=['x'],
-            cost_fns={'x': cost_fn}, protected_attribute_names=[])#'x': cost_lambda})
-        dataset.infer_domain()
-
-        h_all = lambda x: list(map(lambda x: 1 if x[0]>2 else 0.1,x))
-        h = lambda x,single=True: h_all(x)[0] if single else h_all(x)
-        at = AgentTransformer(RationalAgent, h, lambda size: [0.0]*size, None, no_neighbors=1)
-
-        dataset_ = at.transform(dataset)
-
-        expectedFeatures = [[1.], [1.], [2.5], [3.0]]
-        expectedLabels = [0]*2 + [1] * 2
-       # print(at.incentive_df)
-        #print(expectedFeatures, "real",dataset_.features)
-        assert((expectedFeatures == dataset_.features).all())
-        assert((expectedLabels == dataset_.labels.ravel()).all())
-
-    def test_linear_dynamic_cost(self):
-        # should enforce that people manipulate towards the boundary (2)
-        def cost_fn(x_new, x):
-            return x_new/3.
-
-        dataset = TestDataset(mutable_features=['x'],
-            domains={'x': 'auto'},
-            discrete=['x'],
-            cost_fns={'x': cost_fn}, protected_attribute_names=[])#'x': cost_lambda})
-        dataset.infer_domain()
-
-        h_all = lambda x: list(map(lambda x: 1. if x[0]>2 else 0.,x))
-        h = lambda x,single=True: h_all(x)[0] if single else h_all(x)
-        at = AgentTransformer(RationalAgent, h, lambda size: [0.0]*size, None, no_neighbors=1)
-
-        dataset_ = at.transform(dataset)
-
-        expectedFeatures = [[2.5], [2.5], [2.5], [2.5]]
-        expectedLabels = [1] * 4
-        #print("expected", expectedFeatures, "reality", dataset_.features)
-        assert((expectedFeatures == dataset_.features).all())
-        assert((expectedLabels == dataset_.labels.ravel()).all())
-
-    def test_rank_based_dynamic_cost(self):
-        # should enforce that people
-        def cost_fn(x_new, x, rank_fn):
-            print(x_new, x, rank_fn)
-            return rank_fn(x)-rank_fn(x_new)
-
-        dataset = TestDataset(mutable_features=['x'],
-            domains={'x': 'auto'},
-            discrete=['x'],
-            cost_fns={'x': cost_fn}, protected_attribute_names=[])#'x': cost_lambda})
-        dataset.infer_domain()
-
-        h_all = lambda x: list(map(lambda x: 1. if x[0]>2 else 0.,x))
-        h = lambda x,single=True: h_all(x)[0] if single else h_all(x)
-        at = AgentTransformer(RationalAgent, h, lambda size: [0.0]*size, None, no_neighbors=1, collect_incentive_data=True)
-
-        dataset_ = at.transform(dataset)
-
-        expectedFeatures = [[3.], [3.], [3.], [3.]]
-        expectedLabels = [1] * 4
-        assert((expectedFeatures == dataset_.features).all())
-        assert((expectedLabels == dataset_.labels.ravel()).all())
 
 if __name__ == '__main__':
     unittest.main()
