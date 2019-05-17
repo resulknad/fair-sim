@@ -15,6 +15,7 @@ class RationalAgent:
         return b
 
     def cost(self, X_new):
+        #print(np.mean(self.cost_fixed[np.where(X_new[:,8]==0)]))
         return np.add(self.cost_fixed,self.dataset.dynamic_cost(X_new, self.X))
 
     def incentive(self, X_new):

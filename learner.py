@@ -65,8 +65,9 @@ class RejectOptionsLogisticLearner(object):
             return dataset_.labels.ravel()
 
         def h_pr(x):
+            thresh = ro.classification_threshold
             scores = np.array(list(map(lambda x:x[1], reg.predict_proba(x))))
-            orig_pred = reg.predict(x)
+            orig_pred = list(map(lambda x: x[1] > thresh, reg.predict_proba(x)))
             boosted_pred = h(x)
 
             changed = (boosted_pred - orig_pred)
@@ -78,20 +79,26 @@ class RejectOptionsLogisticLearner(object):
 
             bool_increased = np.where(changed == 1)
             if np.array(bool_increased).any():
-                max_increase = (0.5-scores[bool_increased]).max()
+                wrongly_flipped = (x[bool_increased,grp_ind] != unpriv_val).sum()
+                if wrongly_flipped > 0:
+                    raise Warning("RO flipped " + str(wrongly_flipped) + " labels (0 to 1) for privileged group")
+                max_increase = (thresh-scores[bool_increased]).max()
                 scores[x[:,grp_ind]==unpriv_val] += max_increase + 0.00001
+                #print("Increase", max_increase)
 
 
             bool_decreased = np.where(changed == -1)
             if np.array(bool_decreased).any():
-                max_decrease = (scores[bool_decreased] - 0.5).max()
+                wrongly_flipped = (x[bool_decreased,grp_ind] != priv_val).sum()
+                if wrongly_flipped > 0:
+                    raise Warning("RO flipped " + str(wrongly_flipped) + " labels (1 to 0) for unprivileged group out of" + str(len(list(bool_decreased[0]))))
+                max_decrease = (scores[bool_decreased] - thresh).max()
                 scores[x[:,grp_ind]==priv_val] -= max_decrease + 0.000001
+                #print("Decrease", max_decrease)
 
             boosted_pred = np.array(np.where(boosted_pred)[0])
-            score_pred = np.array(np.where(scores>=0.5)[0])
-            diff = np.setdiff1d(boosted_pred,score_pred)
-            #print("setdiff",diff)
-            #print(boosted_pred, score_pred)
+            score_pred = np.array(np.where(scores>=thresh)[0])
+            diff = np.setdiff1d(boosted_pred, score_pred)
             assert(len(diff)==0)
 
             return scores

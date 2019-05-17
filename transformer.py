@@ -22,10 +22,10 @@ def approx_fprime(xk, f, epsilon, args=(), f0=None, immutable=[]):
             ei[:,k] = 1.0
             d = epsilon * ei
             #print("d shape", d.shape, "xk shape", xk.shape)
-            grad[:,k] = (f(*((xk + d,) + args)) - f0) / d[0][k]
+            grad[:,k] = (-f(*((xk - d,) + args)) + f0) / d[0][k]
             ei[k] = 0.0
 
-    return grad
+    return grad, f0
 
 class AgentTransformer(Transformer):
 # this class is not thread safe
@@ -54,18 +54,17 @@ class AgentTransformer(Transformer):
         immutable = [dataset.feature_names.index(dataset.protected_attribute_names[0])]
 
         # x0
-        a = self.agent_class(self.h, dataset, cost, X, y)
+        a = self.agent_class(self.h, dataset, cost, np.copy(X), y)
 
         # max tracking
         #print(x)
 
-        eps = 0.1
-        gradient = approx_fprime(X, a.incentive, eps, immutable=immutable)
+        eps = 0.0001
+        gradient,incentive = approx_fprime(X, a.incentive, eps, immutable=immutable)
         print(gradient.shape)
 
         #print(gradient)
         #print("incentive", a.incentive(x))
-        breakit = False
 
         # calculates bounds for clipping
         # if immutable, then lower bound = upper bound = present value
@@ -83,21 +82,22 @@ class AgentTransformer(Transformer):
         max_domain = max_domain.transpose()
 
         incentive_last = 0
-        incentive = a.incentive(X)
-        for i in range(100):
+        for i in range(400):
             #print(X)
             incentive_last = incentive
             #print("Iteration ",i)
-            X = np.add(X,gradient)
+            X = np.add(X,(400-i)/400*gradient)
             X = np.clip(X, min_domain, max_domain)
-            gradient = approx_fprime(X, a.incentive, eps, immutable=immutable)
+            gradient, incentive = approx_fprime(X, a.incentive, eps, immutable=immutable)
             #print(np.mean(dict(zip(dataset.feature_names, gradient.transpose()))['investment_as_income_percentage']))
             #print(np.mean(dict(zip(dataset.feature_names, min_domain))['investment_as_income_percentage']))
-            incentive = a.incentive(X)
-            if ((incentive-incentive_last) < 0.001).all():
+            #print(max(incentive - incentive_last))
+            if self.collect_incentive_data:
+                self.incentives.append([X[np.where(X[:,6] == 0)],a.benefit(X[np.where(X[:,6] == 0)]), a.cost(X)[np.where(X[:,6] == 0)]])
+            if (abs(incentive - incentive_last) < 0.001).all():
                 break
 
-        print("Gradient ascend stopepd after ",i,"iterations (max 100)")
+        print("Gradient ascend stopepd after ",i+1,"iterations (max 100)")
 
         X = dataset.enforce_dummy_coded(X)
         X_ = []
@@ -146,6 +146,7 @@ class AgentTransformer(Transformer):
         grp1 = []
 
         incentives, X = self._optimal_x_gd(dataset, cost)
+        print("incentive > 0:", (incentives > 0).sum())
 
         for x_vec,x,y,c,incentive in zip(X,dataset.features, dataset.labels, cost, incentives):
 
@@ -237,10 +238,6 @@ class AgentTransformer(Transformer):
 
         # create df for incentives
         ft_names_orig = list(map(lambda x: x+"_orig", dataset.feature_names))
-
-        self.incentive_df = pd.DataFrame(data=self.incentives, columns=['uid'] + ft_names_orig + dataset.feature_names + ['incentive'], dtype=float)
-        self.incentives=[]
-
 
         return dataset_
 

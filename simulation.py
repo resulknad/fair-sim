@@ -124,7 +124,7 @@ class Simulation(object):
         res.acc_h = acc_h
         res.acc_h_post = acc_h_post
         res.acc_h_star_post = acc_h_star_post
-        res.incentives = at.incentive_df
+        res.incentives = at.incentives
         return res
 
 class SimulationResultSet:
@@ -169,7 +169,7 @@ class SimulationResultSet:
         up_pr = self._pr(unpriv, time=time)
         p_pr = self._pr(priv, time=time)
 
-        return abs(up_pr-p_pr)
+        return (p_pr-up_pr)
 
 
     def tpr(self, selection_criteria={}, truth_ft='y', pred_ft='credit_h', time='post'):
@@ -201,6 +201,7 @@ class SimulationResultSet:
 
     def feature_table(self, selection_criteria=[]):
         data = []
+        data.append(count_df(self.results[0].df_new, selection_criteria))
         for ft in list(self.results[0].df_new):
             row = []
             for sc in selection_criteria:
@@ -208,7 +209,7 @@ class SimulationResultSet:
                 row = row + [str(round(pre_mean,2)) + " -> " + str(round(post_mean,2))]
             data.append(row)
 
-        return pd.DataFrame(data=data, index=list(self.results[0].df_new))
+        return pd.DataFrame(data=data, index=["N"] + list(self.results[0].df_new))
 
     def __str__(self):
         return ' '.join(("Runs: ", str(self.runs), "\n",
