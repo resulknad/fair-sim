@@ -22,6 +22,7 @@ from aif360.metrics import BinaryLabelDatasetMetric
 from scipy import optimize
 from plot import _df_selection
 from aif360.algorithms.postprocessing.reject_option_classification import RejectOptionClassification
+from aif360.algorithms.inprocessing.meta_fair_classifier import MetaFairClassifier
 from simulation import Simulation
 
 # util to calc accuracy
@@ -29,6 +30,38 @@ def _accuracy(h, dataset):
     float_to_bool = lambda arr: np.array(list(map(lambda x: True if x == 1.0 else False, arr)))
     n_correct = (float_to_bool(h(dataset.features)) & float_to_bool(dataset.labels.ravel())).sum()
     return n_correct / len(dataset.labels.ravel())
+
+class MetaFairLearner(object):
+    def __init__(self, privileged_group, unprivileged_group):
+        self.privileged_group = privileged_group
+        self.unprivileged_group = unprivileged_group
+
+    def fit(self, dataset):
+        # sanity checks
+        assert(len(self.privileged_group)==1)
+        assert((self.privileged_group[0].keys()==self.unprivileged_group[0].keys()))
+        class_attr = list(self.privileged_group[0].keys())[0]
+        self.dataset = dataset
+
+        self.mfc = MetaFairClassifier(sensitive_attr=class_attr)
+        self.mfc.fit(dataset)
+
+    def predict_proba(self, x):
+        x_with_labels = np.hstack((x, [[0]] * len(x)))
+        dataset_ = Simulation.dataset_from_matrix(x_with_labels, self.dataset)
+
+        scores = self.mfc.predict(dataset_).scores
+        print(scores)
+        return scores
+
+    def predict(self, x):
+        x_with_labels = np.hstack((x, [[0]] * len(x)))
+        dataset_ = Simulation.dataset_from_matrix(x_with_labels, self.dataset)
+
+        return self.mfc.predict(dataset_).labels
+
+    def accuracy(self, dataset):
+        return _accuracy(self.predict, dataset)
 
 class RejectOptionsLogisticLearner(object):
     def __init__(self, privileged_groups, unprivileged_groups, metric_name="Statistical parity difference", abs_bound=0.05):
@@ -50,7 +83,7 @@ class RejectOptionsLogisticLearner(object):
                 privileged_groups=self.privileged_group,
                 metric_name=self.metric_name,
                 metric_ub=self.abs_bound,
-                metric_lb=-self.abs_bound)
+                metric_lb=-self.abs_bound,low_class_thresh=0.45, high_class_thresh=0.55)
         ro.fit(dataset, dataset_p)
 
         def h(x):
@@ -83,8 +116,8 @@ class RejectOptionsLogisticLearner(object):
                 if wrongly_flipped > 0:
                     raise Warning("RO flipped " + str(wrongly_flipped) + " labels (0 to 1) for privileged group")
                 max_increase = (thresh-scores[bool_increased]).max()
-                scores[x[:,grp_ind]==unpriv_val] += max_increase + 0.00001
                 #print("Increase", max_increase)
+                scores[x[:,grp_ind]==unpriv_val] += max_increase + 0.00001
 
 
             bool_decreased = np.where(changed == -1)
@@ -303,6 +336,7 @@ class FairLearnLearner(object):
         self.bc_binary = bc_binary
 
     def predict_proba(self, x):
+        print(self.bc(x))
         return self.bc(x)
 
     def predict(self, x):

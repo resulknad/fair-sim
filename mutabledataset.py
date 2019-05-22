@@ -208,10 +208,10 @@ def custom_preprocessing(df):
     df['sex'] = df['personal_status'].replace(status_map)
     df['foreign_worker'] = df['foreign_worker'].replace({'A201':0, 'A202':1})
     df['savings'] = df['savings'].replace({'A61': 0, 'A62': 1, 'A63': 2, 'A64': 3, 'A65':5})
-    df['credit_amount'] = (df['credit_amount']/max(df['credit_amount'])).apply(lambda x: round(x*8)/8.)
+    df['credit_amount'] = (df['credit_amount']/max(df['credit_amount'])).apply(lambda x: round(x*16)/16.)
     df['has_checking_account'] = df['month'].apply(lambda x: int(not x=='A14'))
     df['status'] = df['status'].replace({'A11': 0, 'A12': 0.5, 'A13': 1, 'A14':0})
-    df['month'] = (df['month']/max(df['month'])).apply(lambda x: round(x*8)/8.)
+    df['month'] = (df['month']/max(df['month'])).apply(lambda x: round(x*16)/16.)
     df['credit'] = df['credit'].map(lambda x: 2-x)
     return df
 

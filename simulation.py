@@ -86,6 +86,8 @@ class Simulation(object):
         at = AgentTransformer(self.AgentCl, self.learner, self.cost_distribution, self.scaler, collect_incentive_data=self.collect_incentive_data, no_neighbors=self.no_neighbors, avg_out_incentive=self.avg_out_incentive, cost_distribution_dep=self.cost_distribution_dep, use_rank=self.use_rank)
 
         dataset_ = at.transform(dataset)
+#        print(dataset_.labels)
+
         train_ = Simulation.dataset_from_matrix(np.hstack((dataset_.features[train_indices,:], dataset_.labels[train_indices])),dataset)
         test_ = Simulation.dataset_from_matrix(np.hstack((dataset_.features[test_indices,:], dataset_.labels[test_indices])),dataset)
 

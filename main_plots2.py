@@ -203,7 +203,16 @@ def merge_all_dfs(result_set):
     df_new = pd.concat(list(map(lambda r: r.df_new, result_set.results)), ignore_index=True)
     return df, df_new
 
+def modify_legend(labels):
+    search = ['0_0', '0_1', '1_0', '1_1']
+    replace = ['Initial UP', 'Impacted UP', 'Initial P', 'Impacted P']
+    for i in range(len(labels)):
+        for k,v in zip(search, replace):
+            labels[i] = labels[i].replace(k,v)
+    return labels
+
 def plot_all_mutable_features(rs,name='a'):
+    sns.set_style("whitegrid")
     pp = PdfPages(name + '.pdf')
 
     all_mutable_dedummy = list(set(map(lambda s: s.split('=')[0], all_mutable)))
@@ -251,39 +260,45 @@ def plot_all_mutable_features(rs,name='a'):
                     # datapoint is missing
                     # add one with y=0
         #print(merged.dtypes)
-        palette = {'0_0': '#4286f4', '0_1':'#91bbff', '1_0':'#ffab28', '1_1':'#ffd491'}
+        palette = {'0_0': '#4286f4', '0_1':'#91bbff', '1_0':'#f45942', '1_1':'#ff9282'}
         if np.issubdtype(merged[mutable_attr], np.number):
             print(mutable_attr)
-            sns.pointplot(x=mutable_attr, hue="time", y="index",
+            ax = sns.pointplot(x=mutable_attr, hue="time", y="index",
                         data=merged, palette=palette, linestyles=['-','--','-','--'])
         else:
-            sns.barplot(x=mutable_attr, hue="time", y="index",
+            ax = sns.barplot(x=mutable_attr, hue="time", y="index",
                         data=merged,  palette=palette)
+        handles, labels = ax.get_legend_handles_labels()
+        print(ax.get_xlabel())
+        ax.set(ylabel='probability density', xlabel=ax.get_xlabel().replace('_', ' '))
+        ax.set_xticklabels(ax.get_xticklabels(),rotation=60)
+        ax.legend(handles=handles[0:], labels=modify_legend(labels[0:]))
         pp.savefig()
 
         plt.show()
     pp.close()
 
-data = dataset()
-#rs = do_sim(FairLearnLearner([privileged_group], [unprivileged_group]), collect_incentive_data=True)
-rs = do_sim(MetaFairLearner([privileged_group], [unprivileged_group]), collect_incentive_data=True)
-#rs = do_sim(LogisticLearner(exclude_protected=True), collect_incentive_data=True)
-# benefit, cost, incentive_mean graph
-d = rs.results[0].incentives
-index = 147 #np.argmax(np.array(d[0][0])[:,3] - np.array(d[len(d)-1][0])[:,3])
-savings = list(starmap(lambda i,x: [i, np.mean(x[0][:,1])], zip(range(len(d)), d)))
-benefit = list(starmap(lambda i,x: [i, np.mean(x[1])], zip(range(len(d)), d)))
-incentive_mean = list(starmap(lambda i,x: [i, np.mean(x[1])-np.mean(x[2])], zip(range(len(d)), d)))
-cost = list(starmap(lambda i,x: [i, np.mean(x[2])], zip(range(len(d)), d)))
-df = pd.DataFrame(data=(np.vstack((savings,benefit,cost,incentive_mean))), columns=["t", "val"], index=(["month"]*len(d) + ["benefit"]*len(d) + ["cost"] * len(d)+ ["incentive_mean"] * len(d))).reset_index()
-plt.figure()
-ax = sns.lineplot(x='t', y="val", hue='index',data=df)
-plt.show()
-plot_all_mutable_features(rs)
+if False:
+    data = dataset()
+    #rs = do_sim(FairLearnLearner([privileged_group], [unprivileged_group]), collect_incentive_data=True)
+    #rs = do_sim(LogisticLearner([privileged_group], [unprivileged_group]), collect_incentive_data=True)
+    rs = do_sim(LogisticLearner(exclude_protected=True), collect_incentive_data=True)
+    # benefit, cost, incentive_mean graph
+    d = rs.results[0].incentives
+    index = 147 #np.argmax(np.array(d[0][0])[:,3] - np.array(d[len(d)-1][0])[:,3])
+    savings = list(starmap(lambda i,x: [i, np.mean(x[0][:,1])], zip(range(len(d)), d)))
+    benefit = list(starmap(lambda i,x: [i, np.mean(x[1])], zip(range(len(d)), d)))
+    incentive_mean = list(starmap(lambda i,x: [i, np.mean(x[1])-np.mean(x[2])], zip(range(len(d)), d)))
+    cost = list(starmap(lambda i,x: [i, np.mean(x[2])], zip(range(len(d)), d)))
+    df = pd.DataFrame(data=(np.vstack((savings,benefit,cost,incentive_mean))), columns=["t", "val"], index=(["month"]*len(d) + ["benefit"]*len(d) + ["cost"] * len(d)+ ["incentive_mean"] * len(d))).reset_index()
+    plt.figure()
+    #ax = sns.lineplot(x='t', y="val", hue='index',data=df)
+    #plt.show()
+    plot_all_mutable_features(rs)
 
-#data = dataset()
-#rs = do_sim(LogisticLearner(exclude_protected=True), collect_incentive_data=False)
-#plot_all_mutable_features(rs)
+    #data = dataset()
+    #rs = do_sim(LogisticLearner(exclude_protected=True), collect_incentive_data=False)
+    #plot_all_mutable_features(rs)
 
 
 # -
@@ -359,9 +374,9 @@ if False:
 # Compare different notions of fairness
 
 data = dataset()
-learners = [("baseline", LogisticLearner(exclude_protected=True)),
-            ("RO_StatPar", RejectOptionsLogisticLearner([privileged_group], [unprivileged_group])),
-            ("RO_EqOpp", RejectOptionsLogisticLearner([privileged_group], [unprivileged_group], metric_name='Equal opportunity difference'))]
+learners = [("no constraint", LogisticLearner(exclude_protected=True)),
+            ("statistical parity", RejectOptionsLogisticLearner([privileged_group], [unprivileged_group])),
+            ("TPR", RejectOptionsLogisticLearner([privileged_group], [unprivileged_group], metric_name='Equal opportunity difference'))]
 #
 ft_name = 'credit_h_pr'
 plot_data = pd.DataFrame(data=[],columns=["name", "time", ft_name])
@@ -377,7 +392,7 @@ for name, l in learners:
         df_post = _df_selection(df_post, sc)
 
         grp = str(list(sc.values())[0])
-        merged_df = merge_dfs('time', 'pre' + grp, 'post'+ grp, df, df_post)
+        merged_df = merge_dfs('time', grp + '_0', grp + '_1', df, df_post)
         merged_df = merged_df[['time', ft_name]]
         merged_df['name'] = pd.Series([name] * len(merged_df.index), merged_df.index)
         plot_data = pd.concat((plot_data, merged_df), ignore_index=True)
@@ -387,15 +402,43 @@ for name, l in learners:
 plot_data_df = pd.DataFrame(plot_data, columns=["name", "time", ft_name])
 
 plt.figure()
-sns.boxplot(x="name", y=ft_name, hue="time",
-            data=plot_data_df)
+sns.set_style("whitegrid")
+palette = {'0_0': '#4286f4', '0_1':'#91bbff', '1_0':'#f45942', '1_1':'#ff9282'}
+
+ax = sns.boxplot(x="name", y=ft_name, hue="time",
+            data=plot_data_df, palette=palette)
+
+
+pp = PdfPages('notions_of_fairness.pdf')
+handles, labels = ax.get_legend_handles_labels()
+print(ax.get_xlabel())
+ax.set(ylabel='benefit', xlabel=ax.get_xlabel().replace('_', ' '))
+ax.set_xticklabels(ax.get_xticklabels(),rotation=0)
+ax.legend(handles=handles[0:], labels=modify_legend(labels[0:]))
+pp.savefig()
+pp.close()
 plt.show()
 
 # average benefit
 # interval plot
 # foreach notion of fairness, each mutable features
-# -
+# + {}
+plt.figure()
+sns.set_style("whitegrid")
+palette = {'0_0': '#4286f4', '0_1':'#91bbff', '1_0':'#f45942', '1_1':'#ff9282'}
 
+ax = sns.boxplot(x="name", y=ft_name, hue="time",
+            data=plot_data_df, palette=palette)
+
+
+handles, labels = ax.get_legend_handles_labels()
+print(ax.get_xlabel())
+ax.set(ylabel='benefit', xlabel=ax.get_xlabel().replace('_', ' '))
+ax.set_xticklabels(ax.get_xticklabels(),rotation=60)
+ax.legend(handles=handles[0:], labels=modify_legend(labels[0:]))
+
+plt.show()
+# -
 
 
 # ## Statistical parity comparison
