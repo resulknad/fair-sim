@@ -5,7 +5,7 @@ import pandas as pd
 #import tensorflow as tf
 from sklearn.linear_model import LinearRegression
 from sklearn.linear_model import LogisticRegression
-from sklearn.naive_bayes import MultinomialNB
+from sklearn.naive_bayes import GaussianNB
 from sklearn.ensemble import RandomForestClassifier
 from sklearn import svm
 from sklearn.model_selection import cross_val_score
@@ -101,7 +101,7 @@ class RejectOptionsLogisticLearner(object):
             diff = np.setdiff1d(boosted_pred, score_pred)
             assert(len(diff)==0)
 
-            return scores
+            return np.clip(scores, None, 1.)
 
 
         self.h_pr = h_pr
@@ -346,7 +346,7 @@ class RandomForestLearner(object):
 
     def fit(self, dataset):
         self.dataset = dataset
-        reg = RandomForestClassifier(n_estimators=100, max_depth=10).fit(self.drop_prot(dataset, dataset.features), dataset.labels.ravel())
+        reg = RandomForestClassifier(n_estimators=100, max_depth=10, n_jobs=1).fit(self.drop_prot(dataset, dataset.features), dataset.labels.ravel())
 
         self.h = reg
 
@@ -362,13 +362,13 @@ class RandomForestLearner(object):
     def accuracy(self, dataset):
         return self.h.score(self.drop_prot(dataset, dataset.features), dataset.labels.ravel())
 
-class MultinomialNBLearner(object):
+class GaussianNBLearner(object):
     def __init__(self, exclude_protected=False):
         self.exclude_protected = exclude_protected
 
     def fit(self, dataset):
         self.dataset = dataset
-        reg = MultinomialNB().fit(self.drop_prot(dataset, dataset.features), dataset.labels.ravel())
+        reg = GaussianNB().fit(self.drop_prot(dataset, dataset.features), dataset.labels.ravel())
 
         #print(sorted(list(zip(dataset.feature_names,reg.coef_[0])),key=lambda x: abs(x[1])))
         #exit(1)

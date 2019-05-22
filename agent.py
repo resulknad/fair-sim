@@ -10,8 +10,9 @@ class RationalAgent:
         self.h = h
 
     def benefit(self, X_new):
+
         #b = self.h.predict_proba(X_new)
-        b = self.h.predict_proba(X_new)
+        b = np.array(self.h.predict_proba(X_new))
         return b
 
     def cost(self, X_new):

@@ -25,10 +25,33 @@ class SimMixin:
         self.domains = {k: self._get_domain(k) if type(v) is not list else v for k,v in self.domains.items()}
         self.ranks = self.rank_fns()
 
+    def scale_dummy_coded(self, X):
+
+        #print(np.where(X[:,12]>0.8))
+
+        for k,v in StructuredDataset._parse_feature_names(self.feature_names)[0].items():
+            ft_indices = (list(map(lambda x: self.feature_names.index(k + '=' + x), v)))
+
+            #if k == 'property':
+            #    print(X[4,ft_indices])
+
+            X[:, ft_indices] = X[:,ft_indices] / X[:, ft_indices].sum(axis=1)[:,None]
+
+            assert(np.isclose(X[:,ft_indices].sum(axis=1).sum(),len(X)))
+
+        return X
+
     def enforce_dummy_coded(self, X):
         for k,v in StructuredDataset._parse_feature_names(self.feature_names)[0].items():
             ft_indices = (list(map(lambda x: self.feature_names.index(k + '=' + x), v)))
+#            print(k,ft_indices, v)
             max_index = np.argmax(X[:,ft_indices], axis=1)
+
+#            for i in range(len(max_index)):
+#                if X[i,ft_indices].sum() > 0 and k == 'credit_history':
+#                    print(k)
+#                    print(X[i,ft_indices])
+#                    print((X[i,ft_indices] == 1))
 
             X[:, ft_indices] = 0
             for i in range(len(max_index)):
@@ -36,7 +59,7 @@ class SimMixin:
             for x in X:
                 assert(x[ft_indices].sum() == 1)
 
-        print(X.shape)
+#        print(X.shape)
         return X
 
     def rank_fns(self):
@@ -54,14 +77,14 @@ class SimMixin:
                 A = np.array(vals[mask])
                 pct = np.array(list(map(lambda x: np.count_nonzero(A <= x)/len(A), A)))
 
-                def create_rank_fn(A, pct):
+                def create_rank_fn(A, pct, group_val):
                     sorted_interp = np.array(sorted(list(zip(A, pct)), key=lambda x: x[0]))
 
-                    return lambda y: np.interp(y,sorted_interp[:,0],sorted_interp[:,1])
+                    return lambda y: np.interp(y, sorted_interp[:,0], sorted_interp[:,1])
 
                 if ranks.get(group_val, None) is None:
                     ranks[group_val] = {}
-                ranks[group_val][ft_name] = create_rank_fn(A, pct)
+                ranks[group_val][ft_name] = create_rank_fn(A, pct, group_val)
         return ranks
 
     def _is_dummy_coded(self, ft):
@@ -204,6 +227,48 @@ class GermanSimDataset(GermanDataset, SimMixin):
                      'employment', 'other_debtors', 'property',
                      'installment_plans', 'housing', 'skill_level', 'telephone'
 ]
+
+        self.human_readable_labels ={"A40": "car (new)",
+            "A41": "car (used)",
+            "A42": "furniture/equipment",
+            "A43": "radio/television",
+            "A44": "domestic appliances",
+            "A45": "repairs",
+            "A46": "education",
+            "A47": "vacation",
+            "A48": "retraining",
+            "A49": "business",
+            "A410": "others",
+            "A30": "no credits taken",
+            "A31": "all credits at this bank paid back duly",
+            "A32": "existing credits paid back duly till now",
+            "A33": "delay in paying off in the past",
+            "A34": "critical account",
+            "A71": "unemployed",
+            "A72": "< 1 year",
+            "A73": "1  <= ... < 4 years",
+            "A74": "4  <= ... < 7 years",
+            "A75": ">= 7 years",
+            "A101": "none",
+            "A102": "co-applicant",
+            "A103": "guarantor",
+            "A121": "real estate",
+            "A122": "building society savings agreement/life insurance",
+            "A123": "car or other",
+            "A124": "unknown / no property",
+            "A141": "bank",
+            "A142": "stores",
+            "A143": "none",
+            "A151": "rent",
+            "A152": "own",
+            "A153": "for free",
+            "A171": "unemployed/ unskilled  - non-resident",
+            "A172": "unskilled - resident",
+            "A173": "skilled employee / official",
+            "A174": "management/ self-employed/ Highly qualified employee/ officer",
+            "A191": "none",
+            "A192": "yes, registered under the customers name"}
+
         GermanDataset.__init__(*(tuple([self]) + args), **kwargs)
         SimMixin.__init__(self, **sim_args)
 

@@ -51,7 +51,7 @@ class Simulation(object):
         dataset = self.dataset.copy(deepcopy=True)
         # we need at least one example for each class in each of the two splits
         while True:
-            train,test = dataset.split(self.split, shuffle=True)
+            train,test = dataset.split(self.split, shuffle=False)
             break
             if self.no_classes(train) >= 2 and self.no_classes(test) >= 2:
                 break
@@ -80,6 +80,7 @@ class Simulation(object):
         ft_indices = list(map(lambda x: not x in ft_names, dataset.feature_names))
 
         self.Y_predicted = self.learner.predict(dataset.features)
+        self.Y_predicted_pr = self.learner.predict_proba(dataset.features)
 
         # agents move
         at = AgentTransformer(self.AgentCl, self.learner, self.cost_distribution, self.scaler, collect_incentive_data=self.collect_incentive_data, no_neighbors=self.no_neighbors, avg_out_incentive=self.avg_out_incentive, cost_distribution_dep=self.cost_distribution_dep, use_rank=self.use_rank)
@@ -95,6 +96,8 @@ class Simulation(object):
 
         #dataset_ = dataset_from_matrix(np.hstack((np.vstack((train_.features, test_.features)), np.vstack((train_.labels, test_.labels)))), dataset)
         self.Y_new_predicted = self.learner.predict(dataset_.features)
+        self.Y_new_predicted_pr = self.learner.predict_proba(dataset_.features)
+        print("MEAN:", np.mean(self.Y_new_predicted_pr))
 
         acc_h_post = self.learner.accuracy(test_)
         #print("Accuracy (h) post",acc_h_post)
@@ -112,10 +115,12 @@ class Simulation(object):
             dataset.features = self.scaler.inverse_transform(dataset.features)
         dataset_df = dataset.convert_to_dataframe(de_dummy_code=True)[0]
         dataset_df['credit_h'] = pd.Series(self.Y_predicted, index=dataset_df.index)
+        dataset_df['credit_h_pr'] = pd.Series(self.Y_predicted_pr, index=dataset_df.index)
         if scale:
             dataset_.features = self.scaler.inverse_transform(dataset_.features)
         dataset_new_df = dataset_.convert_to_dataframe(de_dummy_code=True)[0]
         dataset_new_df['credit_h'] = pd.Series(self.Y_new_predicted, index=dataset_new_df.index)
+        dataset_new_df['credit_h_pr'] = pd.Series(self.Y_new_predicted_pr, index=dataset_new_df.index)
 
         res = SimulationResult()
         res.df = dataset_df
