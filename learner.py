@@ -69,6 +69,13 @@ class RejectOptionsLogisticLearner(object):
         self.unprivileged_group = unprivileged_groups
         self.metric_name = metric_name
         self.abs_bound = abs_bound
+        self.threshold = 0.
+        self.max_increase = 0.
+        self.max_decrease = 0.
+        self.no_increased = 0
+
+    def debug_info(self):
+        return str(self.threshold) + "\t" + str(self.max_increase) + "\t" + str(self.max_decrease) + "\t" + str(self.no_increased)
 
     def fit(self, dataset):
         reg = LogisticRegression(solver='liblinear',max_iter=1000000000, C=1000000000000000000000.0).fit(dataset.features, dataset.labels.ravel())
@@ -83,8 +90,10 @@ class RejectOptionsLogisticLearner(object):
                 privileged_groups=self.privileged_group,
                 metric_name=self.metric_name,
                 metric_ub=self.abs_bound,
-                metric_lb=-self.abs_bound,low_class_thresh=0.45, high_class_thresh=0.55)
+                metric_lb=-self.abs_bound,low_class_thresh=0.45, high_class_thresh=.55)
         ro.fit(dataset, dataset_p)
+
+        self.threshold = ro.classification_threshold
 
         def h(x):
             # add dummy labels as we're going to predict them anyway...
@@ -97,7 +106,7 @@ class RejectOptionsLogisticLearner(object):
             dataset_ = ro.predict(dataset_)
             return dataset_.labels.ravel()
 
-        def h_pr(x):
+        def h_pr(x,boost=True):
             thresh = ro.classification_threshold
             scores = np.array(list(map(lambda x:x[1], reg.predict_proba(x))))
             orig_pred = list(map(lambda x: x[1] > thresh, reg.predict_proba(x)))
@@ -111,22 +120,31 @@ class RejectOptionsLogisticLearner(object):
 
 
             bool_increased = np.where(changed == 1)
+            max_increase = 0.
             if np.array(bool_increased).any():
+                #print(bool_increased[0])
+                self.no_increased = len(bool_increased[0])
                 wrongly_flipped = (x[bool_increased,grp_ind] != unpriv_val).sum()
                 if wrongly_flipped > 0:
                     raise Warning("RO flipped " + str(wrongly_flipped) + " labels (0 to 1) for privileged group")
                 max_increase = (thresh-scores[bool_increased]).max()
+                self.max_increase = max_increase
                 #print("Increase", max_increase)
-                scores[x[:,grp_ind]==unpriv_val] += max_increase + 0.00001
+                #scores[x[:,grp_ind]==unpriv_val] += max_increase + 0.00001
+                scores[bool_increased[0]] += max_increase + 0.00001
 
 
             bool_decreased = np.where(changed == -1)
+            max_decrease = 0.
             if np.array(bool_decreased).any():
+                #print(ro.classification_threshold - ro.ROC_margin)
                 wrongly_flipped = (x[bool_decreased,grp_ind] != priv_val).sum()
                 if wrongly_flipped > 0:
                     raise Warning("RO flipped " + str(wrongly_flipped) + " labels (1 to 0) for unprivileged group out of" + str(len(list(bool_decreased[0]))))
                 max_decrease = (scores[bool_decreased] - thresh).max()
-                scores[x[:,grp_ind]==priv_val] -= max_decrease + 0.000001
+                self.max_decrease = max_decrease
+                #scores[x[:,grp_ind]==priv_val] -= max_decrease + 0.000001
+                scores[bool_decreased[0]] -= max_decrease + 0.00001
                 #print("Decrease", max_decrease)
 
             boosted_pred = np.array(np.where(boosted_pred)[0])
@@ -134,14 +152,40 @@ class RejectOptionsLogisticLearner(object):
             diff = np.setdiff1d(boosted_pred, score_pred)
             assert(len(diff)==0)
 
-            return np.clip(scores, None, 1.)
 
+
+            return np.clip(scores, None, 1.) if boost else np.array(list(map(lambda x:x[1], reg.predict_proba(x))))
 
         self.h_pr = h_pr
         self.h = h
 
-    def predict_proba(self, x):
-        return self.h_pr(x)
+        def bak():
+            bool_increased = np.where(changed == 1)
+            bool_decreased = np.where(changed == -1)
+            if self.threshold == 0:
+                max_increase = (thresh-scores[bool_increased]).max()
+                max_decrease = (scores[bool_decreased] - thresh).max()
+
+                self.threshold = thresh
+                self.max_increase = max_increase
+                self.max_decrease = max_decrease
+
+
+            scores[x[:,grp_ind]==unpriv_val] += self.max_increase + 0.00001
+            scores[x[:,grp_ind]==priv_val] -= self.max_decrease + 0.000001
+
+
+            #boosted_pred = np.array(np.where(boosted_pred)[0])
+            #score_pred = np.array(np.where(scores>=thresh)[0])
+            #diff = np.setdiff1d(boosted_pred, score_pred)
+            #assert(len(diff)==0)
+
+
+            return np.clip(scores, None, 1.)
+
+
+    def predict_proba(self, x, boost=True):
+        return self.h_pr(x, boost)
 
     def predict(self, x):
         return self.h(x)
@@ -312,6 +356,7 @@ class StatisticalParityLogisticLearner(object):
         return _accuracy(self.h, dataset)
 
 class FairLearnLearner(object):
+    threshold = 0.5
     def __init__(self, privileged_group, unprivileged_group):
         self.privileged_group = privileged_group
         self.unprivileged_group = unprivileged_group
@@ -336,8 +381,7 @@ class FairLearnLearner(object):
         self.bc_binary = bc_binary
 
     def predict_proba(self, x):
-        print(self.bc(x))
-        return self.bc(x)
+        return np.array(self.bc(x))
 
     def predict(self, x):
         return self.bc_binary(x)
@@ -421,6 +465,7 @@ class GaussianNBLearner(object):
         return self.h.score(self.drop_prot(dataset, dataset.features), dataset.labels.ravel())
 
 class LogisticLearner(object):
+    threshold = 0.5
     def __init__(self, exclude_protected=False):
         self.exclude_protected = exclude_protected
 
@@ -447,6 +492,7 @@ class LogisticLearner(object):
 
 
 class ReweighingLogisticLearner(object):
+    threshold = 0.5
     def __init__(self, privileged_group, unprivileged_group):
         self.privileged_group = privileged_group
         self.unprivileged_group = unprivileged_group
@@ -460,12 +506,13 @@ class ReweighingLogisticLearner(object):
                                              privileged_groups=self.privileged_group).mean_difference()
         dataset_ = RW.fit_transform(dataset)
 
-        #print("before reweighing (meandiff):",mean_diff_metric(dataset),"after:",mean_diff_metric(dataset_))
+        print("before reweighing (meandiff):",mean_diff_metric(dataset),"after:",mean_diff_metric(dataset_))
 
+        #reg_ = LogisticRegression(solver='liblinear',max_iter=1000000000, C=1000000000000000000000.0).fit(dataset_.features, dataset_.labels.ravel())
 
         reg = LogisticRegression(solver='liblinear',max_iter=1000000000, C=1000000000000000000000.0).fit(dataset_.features, dataset_.labels.ravel(), sample_weight=dataset_.instance_weights)
         #print("reweighted",sorted(list(zip(dataset.feature_names,reg.coef_[0])),key=lambda x: abs(x[1])))
-        reg = LogisticRegression(solver='liblinear',max_iter=1000000000, C=1000000000000000000000.0).fit(dataset_.features, dataset_.labels.ravel())
+
         #print(sorted(list(zip(dataset.feature_names,reg.coef_[0])),key=lambda x: abs(x[1])))
 
         self.h = reg

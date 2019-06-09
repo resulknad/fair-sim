@@ -22,7 +22,7 @@ def approx_fprime(xk, f, epsilon, args=(), f0=None, immutable=[]):
         if k not in immutable:
             ei[:,k] = 1.0
             d = epsilon * ei
-            #print("d shape", d.shape, "xk shape", xk.shape)
+#            print("d shape", d.shape, "xk shape", xk.shape)
             grad[:,k] = (f(*((xk + d*0.5,) + args)) - f(*((xk - d*0.5,) + args))) / d[0][k]
             #grad[:,k] = (-f(*((xk - d,) + args)) + f0) / d[0][k]
 #            grad[:,k] = (-f(*((xk - d,) + args)) + f0) / d[0][k]
@@ -30,6 +30,34 @@ def approx_fprime(xk, f, epsilon, args=(), f0=None, immutable=[]):
 
     #grad = grad/np.linalg.norm(grad, ord=1, axis=1, keepdims=True)
     return grad, f0
+
+def approx_fprime_exact(xk, f, epsilon, args=(), f0=None, immutable=[]):
+    if f0 is None:
+        f0 = f(*((xk,) + args))
+    n_instances, n_features = xk.shape
+    grad = np.zeros(xk.shape, float)
+    ei = np.zeros(xk.shape, float)
+    for k in range(n_features):
+        if k not in immutable:
+            for l in range(n_instances):
+                ei[l,k] = 1.0
+                d = epsilon * ei
+#                print("d shape", d.shape, "xk shape", xk.shape)
+                grad[l,k] = ((f(*((xk + d*0.5,) + args)) - f(*((xk - d*0.5,) + args))) / d[l][k])[l]
+                #grad[:,k] = (-f(*((xk - d,) + args)) + f0) / d[0][k]
+    #            grad[:,k] = (-f(*((xk - d,) + args)) + f0) / d[0][k]
+                ei[l,k] = 0.0
+
+    #grad = grad/np.linalg.norm(grad, ord=1, axis=1, keepdims=True)
+    return grad, f0
+
+#def fn(X):
+#    if not X[1][0] == 2:
+#        return X.ravel()*2
+#    else:
+#        return X.ravel()*3
+#print(approx_fprime(np.array([[1],[2],[3]]), fn, 0.01))
+#print(approx_fprime_exact(np.array([[1],[2],[3]]), fn, 0.01))
 
 class AgentTransformer(Transformer):
 # this class is not thread safe
@@ -65,6 +93,7 @@ class AgentTransformer(Transformer):
 
         # x0
         a = self.agent_class(self.h, dataset, cost, np.copy(X), y)
+        a.threshold = self.h.threshold
 
         # max tracking
         #print(x)
@@ -79,6 +108,7 @@ class AgentTransformer(Transformer):
         #print(dataset.domains)
         # calculates bounds for clipping
         # if immutable, then lower bound = upper bound = present value
+
         min_domain = np.array(list(starmap(
                 lambda i,ft: np.repeat(min(dataset.domains[ft]),len(X)) if ft in dataset.domains
                 else X[:,i],
@@ -92,11 +122,28 @@ class AgentTransformer(Transformer):
         min_domain = min_domain.transpose()
         max_domain = max_domain.transpose()
 
-        if self.collect_incentive_data:
-            self.incentives.append([X[np.where(X[:,6] == 0)],a.benefit(X[np.where(X[:,6] == 0)]), a.cost(X)[np.where(X[:,6] == 0)]])
+        def collect_incentive_data(X):
+            if self.collect_incentive_data:
+                #gradient_benefit, _ = approx_fprime(X, a.benefit, eps, immutable=immutable)
+                #def bf(x):
+                #    return a.benefit(x, boost=False)
+                #gradient_benefit_wob, _ = approx_fprime(X, bf, eps, immutable=immutable)
+                grp = 1
+                self.incentives.append({'features': X,
+                    'benefit': a.benefit(X),
+                    'cost': a.cost(X),
+                    'boost': 0.})#self.h.max_increase})
+                #    'benefit_grad': gradient_benefit[np.where(X[:,6] == 0)],
+                #    'benefit_grad_wob': gradient_benefit_wob[np.where(X[:,6] == 0)]})
 
+        collect_incentive_data(X)
+
+        print("starting GA")
         incentive_last = 0
-        for i in range(60):
+        MAXIT = self.no_neighbors
+        for i in range(MAXIT):
+            #print(i,"\t",self.h.debug_info())
+
             #print(X)
             incentive_last = incentive
             #print("Iteration ",i)
@@ -109,8 +156,6 @@ class AgentTransformer(Transformer):
 
             gradient, incentive = approx_fprime(X, a.incentive, eps, immutable=immutable)
 
-
-
             #rel_x = list(X[147])
 
             #sample = np.linspace(-1,2,100)
@@ -120,8 +165,14 @@ class AgentTransformer(Transformer):
             #ax = sns.lineplot(x='x', y="y",data=df)
 
             #plt.show()
-            def gr(X):
-                return X[20,1]
+
+            #def gr(X):
+            #    return X[5,1]
+
+
+            #print("grad",gr(gradient_benefit),"wob",gr(gradient_benefit_wob))
+
+            collect_incentive_data(X)
 
             #gradient_cost, _ = approx_fprime(X, a.cost, eps, immutable=immutable)
             #gradient_benefit, _ = approx_fprime(X, a.benefit, eps, immutable=immutable)
@@ -134,14 +185,13 @@ class AgentTransformer(Transformer):
             #print(np.mean(dict(zip(dataset.feature_names, X.transpose()))['credit_history=A34']))
             #print(np.mean(dict(zip(dataset.feature_names, min_domain))['investment_as_income_percentage']))
             #print(max(incentive - incentive_last))
-            if self.collect_incentive_data:
-                self.incentives.append([X[np.where(X[:,6] == 0)],a.benefit(X[np.where(X[:,6] == 0)]), a.cost(X)[np.where(X[:,6] == 0)]])
+
             #print(max(abs(incentive - incentive_last)))
             if (abs(incentive - incentive_last) < 0.001).all() and i>20:
                 break
 
 
-        print("Gradient ascend stopped after ",i+1,"iterations (max 60, min 20)")
+        print("Gradient ascend stopped after ",i+1,"iterations (max i", MAXIT,", min 20)")
 
         #print(np.mean(dict(zip(dataset.feature_names, X.transpose()))['credit_history=A34']))
         X = dataset.enforce_dummy_coded(X)
@@ -164,8 +214,9 @@ class AgentTransformer(Transformer):
 
         X_ = np.array(X_)
         X_ = X_.transpose()
-        if self.collect_incentive_data:
-            self.incentives.append([X_[np.where(X_[:,6] == 0)],a.benefit(X_)[np.where(X_[:,6] == 0)], a.cost(X_)[np.where(X_[:,6] == 0)]])
+        collect_incentive_data(X_)
+        #if self.collect_incentive_data:
+            #self.incentives.append([X_[np.where(X_[:,6] == 0)],a.benefit(X_)[np.where(X_[:,6] == 0)], a.cost(X_)[np.where(X_[:,6] == 0)]])
 
 
 
@@ -174,7 +225,6 @@ class AgentTransformer(Transformer):
 
 
     def _do_simulation(self, dataset, gradient_descent=True):
-
         # setup incentive data collection
         if self.collect_incentive_data:
             self.incentives = []

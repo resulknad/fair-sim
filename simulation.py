@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+import pickle
 from functools import reduce
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler, MaxAbsScaler
@@ -11,7 +12,7 @@ import re
 from transformer import AgentTransformer
 
 class Simulation(object):
-    def __init__(self, dataset, AgentCl, learner, cost_distribution, split=[0.5], collect_incentive_data=False, no_neighbors=51, avg_out_incentive=1, cost_distribution_dep=None, use_rank=True):
+    def __init__(self, dataset, AgentCl, learner, cost_distribution, split=[0.5], collect_incentive_data=False, no_neighbors=60, avg_out_incentive=1, cost_distribution_dep=None, use_rank=True):
         self.dataset = dataset
         self.no_neighbors = no_neighbors
         self.cost_distribution = cost_distribution
@@ -136,6 +137,18 @@ class Simulation(object):
 
 class SimulationResultSet:
     results = []
+
+    def save(self, filename):
+        dumpfile = open(filename, 'ab')
+        pickle.dump(self, dumpfile)
+        dumpfile.close()
+
+    def load(filename):
+        rs = {}
+        dumpfile = open(filename, 'ab')
+        pickle.dump(rs, dumpfile)
+        dumpfile.close()
+        return rs
 
     def __init__(self, results, runs=0):
         self.results = results

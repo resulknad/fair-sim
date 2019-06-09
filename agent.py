@@ -2,6 +2,7 @@ import time
 import numpy as np
 
 class RationalAgent:
+    threshold = 0.
     def __init__(self, h, dataset, cost, X, y):
         self.dataset = dataset
         self.cost_fixed = cost
@@ -10,7 +11,6 @@ class RationalAgent:
         self.h = h
 
     def benefit(self, X_new):
-
         #b = self.h.predict_proba(X_new)
         b = np.array(self.h.predict_proba(X_new))
         return b
@@ -24,7 +24,13 @@ class RationalAgent:
         return inc
 
 class RationalAgentOrig(RationalAgent):
+    threshold = 0.
     def benefit(self, X_new):
+        if self.threshold == 0.:
+            raise Warning("threshold 0")
         pr = np.array(self.h.predict_proba(X_new))
-        b = np.clip(pr, None, 0.6) + np.interp(pr - 0.4, [0,0.1], [0,0.4])
+        b =  np.clip(pr/(self.threshold+0.2), None,1.)
         return b
+
+        # b = np.clip(pr, None, 0.6) + np.interp(pr - 0.4, [0,0.1], [0,0.4])
+        # return b
