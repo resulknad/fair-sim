@@ -1,9 +1,11 @@
 import matplotlib.pyplot as plt
+from itertools import starmap
 import numpy as np
 from functools import reduce
 import pandas as pd
 import seaborn as sns
 from matplotlib.backends.backend_pdf import PdfPages
+from utils import _df_selection, count_df
 
 
 def extract_metric(rs, metric_name="statpar", time='post'):
@@ -40,6 +42,51 @@ def modify_legend(labels):
         for k,v in zip(search, replace):
             labels[i] = labels[i].replace(k,v)
     return labels
+
+def print_logreg_coeffs(data):
+    l = LogisticLearner()
+    l.fit(data)
+
+    display(Markdown("#### LogReg Coeffs."))
+    display(pd.DataFrame(columns=['Feature', 'Coefficient LogReg'], data=l.coefs))
+
+def plot_ga(rs, index):
+    # benefit, cost, incentive_mean graph
+    d = rs.results[0].incentives
+    #np.argmax(np.array(d[0][0])[:,3] - np.array(d[len(d)-1][0])[:,3])
+    savings = list(starmap(lambda i,x: [i, np.mean(x['features'][:,1][index])], zip(range(len(d)), d)))
+    benefit = list(starmap(lambda i,x: [i, np.mean(x['benefit'][index])], zip(range(len(d)), d)))
+    boost = list(starmap(lambda i,x: [i, x['boost']], zip(range(len(d)), d)))
+    incentive_mean = list(starmap(lambda i,x: [i, np.mean(x['benefit'])-np.mean(x['cost'])], zip(range(len(d)), d)))
+    cost = list(starmap(lambda i,x: [i, np.mean(x['cost'][index])], zip(range(len(d)), d)))
+    df = pd.DataFrame(data=(np.vstack((savings,
+                                       benefit,
+                                       cost,
+                                       #incentive_mean,
+                                       boost))),
+                      columns=["t", "val"],
+                      index=(["month"]*len(d)
+                             + ["benefit"]*len(d)
+                             + ["cost"] * len(d)
+                             #+ ["incentive_mean"] * len(d)
+                             + ["boost"] * len(d))).reset_index()
+    plt.figure()
+    ax = sns.lineplot(x='t', y="val", hue='index',data=df)
+    display(d['features'][index,:])
+    plt.show()
+
+
+def plot_distribution(dataset, dist_plot_attr):
+    dataset.infer_domain()
+    fns = dataset.rank_fns()
+    sample = np.linspace(-1,10,100)
+    data_arr = list(map(fns[0][dist_plot_attr], sample))
+    data_arr.extend(list(map(fns[1][dist_plot_attr], sample)))
+    data_arr = np.array([np.hstack((sample,sample)), data_arr]).transpose()
+    df = pd.DataFrame(data=data_arr, columns=['x', 'y'])
+    ax = sns.lineplot(x='x', y="y",data=df)
+    display(Markdown("### Distribution of " + dist_plot_attr))
+    plt.show()
 
 def plot_all_mutable_features(rs, unprivileged_group, privileged_group, dataset,all_mutable,name='a', kind='pdf'):
     sns.set_style("whitegrid")
@@ -96,14 +143,17 @@ def plot_all_mutable_features(rs, unprivileged_group, privileged_group, dataset,
                     # add one with y=0
         #print(merged.dtypes)
         merged = merged.sort_values(mutable_attr)
-        if kind == 'cdf':
-            for time in ['0_0', '0_1', '1_0','1_1']:
-                mask = merged['time'] == time
-                merged.loc[mask,'index'] = merged.loc[mask,'index'].cumsum()
+
 
         palette = {'0_0': '#4286f4', '0_1':'#91bbff', '1_0':'#f45942', '1_1':'#ff9282'}
+        ylabel = 'probability density'
+
         if np.issubdtype(merged[mutable_attr], np.number):
-            #print(mutable_attr)
+            if kind == 'cdf':
+                ylabel = 'cumulative probability'
+                for time in ['0_0', '0_1', '1_0','1_1']:
+                    mask = merged['time'] == time
+                    merged.loc[mask,'index'] = merged.loc[mask,'index'].cumsum()
             ax = sns.pointplot(x=mutable_attr, hue="time", y="index",
                         data=merged, palette=palette, linestyles=['-','--','-','--'])
         else:
@@ -111,7 +161,8 @@ def plot_all_mutable_features(rs, unprivileged_group, privileged_group, dataset,
                         data=merged,  palette=palette)
         handles, labels = ax.get_legend_handles_labels()
         #print(ax.get_xlabel())
-        ax.set(ylabel='probability density', xlabel=ax.get_xlabel().replace('_', ' '))
+
+        ax.set(ylabel=ylabel, xlabel=ax.get_xlabel().replace('_', ' '))
         ax.set_xticklabels(ax.get_xticklabels(),rotation=60)
         ax.legend(handles=handles[0:], labels=modify_legend(labels[0:]))
         pp = PdfPages(name + '_' + ax.get_xlabel() +'.pdf')
@@ -154,13 +205,3 @@ def boxplot(rss, up, p):
     pp.savefig(bbox_inches="tight")
     pp.close()
     plt.show()
-
-def _df_selection(df, selection_criteria):
-    if len(selection_criteria.items()) == 0:
-        return df
-    # ands all the selection criterias, returns selected rows
-    arr = list(map(lambda tpl: np.array(df[tpl[0]] == tpl[1]), selection_criteria.items()))
-    return df[reduce(lambda x,y: x&y, arr)]
-
-def count_df(df, selection_criterias):
-    return np.array(list(map(lambda x: len(_df_selection(df,x)), selection_criterias)))

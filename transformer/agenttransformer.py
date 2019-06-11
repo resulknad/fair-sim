@@ -1,3 +1,4 @@
+
 import matplotlib.pyplot as plt
 import seaborn as sns
 from itertools import starmap
@@ -148,7 +149,8 @@ class AgentTransformer(Transformer):
             incentive_last = incentive
             #print("Iteration ",i)
             X = np.add(X,0.1* gradient)#((100-i)/100)*gradient)
-            #X = dataset.scale_dummy_coded(X)
+            X = dataset.scale_dummy_coded(X)
+
             X = np.clip(X, min_domain, max_domain)
 
             #gr = lambda gr: gr[147][3]
@@ -255,11 +257,9 @@ class AgentTransformer(Transformer):
             if incentive > 0 and not (x_vec == x).all():
                 features_.append(np.array(x_vec))
                 changed_indices.append(i)
-                labels_.append([])
-
             else:
                 features_.append(np.array(x))
-                labels_.append(y)
+            labels_.append(y)
             i+=1
             #print(features_)
         dataset_.features = features_
@@ -271,8 +271,7 @@ class AgentTransformer(Transformer):
 
         # no changes during simulation
         # no need to assign new labels with KNN
-        print("no knn atm")
-        if len(changed_indices) == 0 or True:
+        if len(changed_indices) == 0:
             dataset_.features = X
             dataset_.labels = dataset.labels #np.array(Y.tolist())
             return dataset_
@@ -315,21 +314,9 @@ class AgentTransformer(Transformer):
         unique = np.unique(X_changed, axis=0)
 
 
-#        for group_val in group_vals:
-#            # fit KNN to unchanged (during simulation) datapoints
-#            cost_dist = lambda x,y: dataset.dynamic_cost(np.array([y]),np.array([x]))[0]
-#
-#            group_mask = dataset.features[:,group_ind] == group_val
-#            nbrs = KNeighborsClassifier(algorithm='brute',n_neighbors=self.no_neighbors, weights='distance', metric=cost_dist, n_jobs=1).fit(dataset.features[group_mask], dataset.labels.ravel()[group_mask])
-#
-#            ch_group_mask = np.where(X_changed[:,group_ind] == group_val)[0]
-#            labels = nbrs.predict(X_changed[ch_group_mask])
-#            Y_changed[ch_group_mask] = list(map(lambda x: [x],labels))
-
         Y[changed_indices] = Y_changed
 
 
-#        assert(Y.sum() >= dataset.labels.sum())
         # update labels (ground truth)
         dataset_.features = X
         dataset_.labels = np.array(Y.tolist())
@@ -344,5 +331,3 @@ class AgentTransformer(Transformer):
         ft_names_orig = list(map(lambda x: x+"_orig", dataset.feature_names))
 
         return dataset_
-
-

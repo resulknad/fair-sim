@@ -19,6 +19,7 @@
 
 import pickle
 from mutabledataset import GermanSimDataset
+from itertools import starmap
 from sklearn.preprocessing import MaxAbsScaler
 from agent import RationalAgent, RationalAgentOrig
 from simulation import Simulation, SimulationResultSet
@@ -28,7 +29,7 @@ import numpy as np
 import pandas as pd
 from learner import StatisticalParityLogisticLearner, StatisticalParityFlipperLogisticLearner
 from learner import FairLearnLearner
-from learner import GaussianNBLearner
+from learner import RandomForestLearner, GaussianNBLearner
 from learner import RejectOptionsLogisticLearner, MetaFairLearner
 from learner import ReweighingLogisticLearner
 from IPython.display import display, Markdown, Latex
@@ -37,7 +38,7 @@ import seaborn as sns
 from numpy.random import normal
 from IPython.display import display, Markdown, Latex
 from scipy.special import huber
-from utils import _df_selection, count_df
+from plot import _df_selection, count_df
 
 sns.set(rc={'figure.figsize':(20.7,8.27)})
 # -
@@ -140,97 +141,80 @@ def load(filename):
     return rs
 
 
-# # Notions of Fairness
-
-# +
-# Compare different notions of fairness
-
-for k in range(20):
-    data = dataset()
-    COST_CONST = k+1
-    data = dataset()
-    learners = [("no constraint", LogisticLearner(exclude_protected=True)),
-                ("statistical parity", RejectOptionsLogisticLearner([privileged_group], [unprivileged_group])),
-                ("AvOdds", RejectOptionsLogisticLearner([privileged_group], [unprivileged_group], metric_name='Average odds difference'))]
-
-    # execute
-    rss = list(map(lambda x: (x[0],do_sim(x[1], no_neighbors=60)), learners))
-
-    # save
-    save(rss, "notions_of_fairness_" + str(COST_CONST))
-    print("saved ",k)
-
-# +
-
-# load
-#rss = load("notions_of_fairness_2")
-
-for name, rs in rss:
-    display(Markdown("## " + name))
-    #plot.plot_all_mutable_features(rs, unprivileged_group, privileged_group, dataset, all_mutable, name=name)
-
-#plot.boxplot(rss, unprivileged_group, privileged_group)
-
-# -
-
-
-
-
-# ## Statistical parity comparison
-# with protected attributes included, otherwise it's boring...
-#
-# gtdiff: difference of averages (of priv and unpriv) of the new ground truth (assigned by KNN with custom cost function as distance)
-
-# +
-
-
-for k in range(20):
-    data = dataset()
-    COST_CONST = k+1
-    learners = [("baseline", LogisticLearner(exclude_protected=False)),
-        ("pre", ReweighingLogisticLearner([privileged_group], [unprivileged_group])),
-        ("in",FairLearnLearner([privileged_group], [unprivileged_group])),
-        ("post",RejectOptionsLogisticLearner([privileged_group], [unprivileged_group]))]
-
-    # execute
-    rss = list(map(lambda x: (x[0],do_sim(x[1], no_neighbors=60)), learners))
-
-    # save
-    save(rss, "statpar_comp_cost_" + str(COST_CONST))
-
-# -
-
-
-
-# +
-# load
-rss = load("statpar_comp_cost2")
-df = rss[0][1].results[0].df
-print(np.mean(df.loc[df['age'] == 1,'credit_h_pr']))
-#for ft in all_mutable:
-    #for name, rs in rss:
-        #display(Markdown("## " + name))
-        #if name == 'post':
-        #print(rs.feature_table([unprivileged_group, privileged_group]))
-        #plot.plot_all_mutable_features(rs, unprivileged_group, privileged_group, dataset, [ft], name=name, kind='cdf')
-
-plot.boxplot(rss, unprivileged_group, privileged_group)
-
-# +
-# load
-rss = load("statpar_comp_cost12_2")
-
-for name, rs in rss:
-    display(Markdown("## " + name))
-    #if name == 'post':
-    plot.plot_all_mutable_features(rs, unprivileged_group, privileged_group, dataset, ['month'], name=name, kind='cdf')
-
-plot.boxplot(rss, unprivileged_group, privileged_group)
-
-
 # -
 
 # ## LogReg feature coefficients
+
+# +
+data = dataset()
+
+l = LogisticLearner()
+l.fit(data)
+
+display(Markdown("#### LogReg Coeffs."))
+#display(pd.DataFrame(columns=['Feature', 'Coefficient LogReg'], data=l.coefs))
+
+dist_plot_attr = 'savings'
+data.infer_domain()
+fns = data.rank_fns()
+if False:
+    sample = np.linspace(-1,10,100)
+    data_arr = list(map(fns[0][dist_plot_attr], sample))
+    data_arr.extend(list(map(fns[0][dist_plot_attr], sample)))
+    data_arr = np.array([np.hstack((sample,sample)), data_arr]).transpose()
+    df = pd.DataFrame(data=data_arr, columns=['x', 'y'])
+    ax = sns.lineplot(x='x', y="y",data=df)
+    display(Markdown("### Distribution of " + dist_plot_attr))
+    plt.show()
+
+
+    # -
+
+    # ## Logistic Learner
+    rs = do_sim(LogisticLearner(exclude_protected=True), collect_incentive_data=False)
+    display(Markdown("#### Feature averages per group LogReg protected excluded"))
+    display(rs.feature_table([unprivileged_group, privileged_group]))
+    display(Markdown("#### Equilibrium related results"))
+    display(str(rs))
+    #for grp_avg in (rs.results[0].df_new.groupby([group_attr]).mean().reset_index()):
+    #    samples = np.linspace(min(data.domains[mutable_attr]), max(data.domains[mutable_attr]),50)
+    #    incentive =
+
+    # +
+    #ax = sns.lineplot(x=mutable_attr, y="incentive",hue=group_attr,data=(rs.
+    #    _avg_incentive(mutable_attr, group_attr)).reset_index())
+    #plt.show()
+
+    # +
+display(Markdown("#### (log reg) distribution pre/post sim for " + mutable_attr))
+
+
+# -
+
+def plot_ga(rs, index):
+    # benefit, cost, incentive_mean graph
+    d = rs.results[0].incentives
+    #np.argmax(np.array(d[0][0])[:,3] - np.array(d[len(d)-1][0])[:,3])
+    savings = list(starmap(lambda i,x: [i, np.mean(x['features'][:,1][index])], zip(range(len(d)), d)))
+    benefit = list(starmap(lambda i,x: [i, np.mean(x['benefit'][index])], zip(range(len(d)), d)))
+    boost = list(starmap(lambda i,x: [i, x['boost']], zip(range(len(d)), d)))
+    incentive_mean = list(starmap(lambda i,x: [i, np.mean(x['benefit'])-np.mean(x['cost'])], zip(range(len(d)), d)))
+    cost = list(starmap(lambda i,x: [i, np.mean(x['cost'][index])], zip(range(len(d)), d)))
+    df = pd.DataFrame(data=(np.vstack((savings,
+                                       benefit,
+                                       cost,
+                                       #incentive_mean,
+                                       boost))),
+                      columns=["t", "val"],
+                      index=(["month"]*len(d)
+                             + ["benefit"]*len(d)
+                             + ["cost"] * len(d)
+                             #+ ["incentive_mean"] * len(d)
+                             + ["boost"] * len(d))).reset_index()
+    plt.figure()
+    ax = sns.lineplot(x='t', y="val", hue='index',data=df)
+    plt.show()
+
 
 # +
 
@@ -240,7 +224,7 @@ data = dataset()
 COST_CONST = 8
 #rs_log = do_sim(LogisticLearner(exclude_protected=False), no_neighbors=1, collect_incentive_data=True)
 
-rs_ro = do_sim(RejectOptionsLogisticLearner([privileged_group], [unprivileged_group]), no_neighbors=1, collect_incentive_data=True)
+rs_ro = do_sim(RejectOptionsLogisticLearner([privileged_group], [unprivileged_group]), no_neighbors=60, collect_incentive_data=True)
 
 
 #COST_CONST = 3
@@ -257,7 +241,7 @@ rs_ro = do_sim(RejectOptionsLogisticLearner([privileged_group], [unprivileged_gr
 
 
 # +
-plot.plot_ga(rs_ro, 11)
+plot_ga(rs_ro, 11)
 plot.boxplot([("ro", rs_ro)], unprivileged_group, privileged_group)
 
 #index = 5
@@ -347,7 +331,7 @@ learners = [("baseline_wp", LogisticLearner(exclude_protected=False)),
     ("pre", ReweighingLogisticLearner([privileged_group], [unprivileged_group]))]
 rss = []
 for i in range(10):
-    COST_CONST = i+1
+    COST_CONST = 10+i
     rs =  do_sim(RejectOptionsLogisticLearner([privileged_group], [unprivileged_group]), no_neighbors=60)
     #plot.plot_all_mutable_features(rs, unprivileged_group, privileged_group, dataset, all_mutable, name=name)
     rss.append((str(COST_CONST), rs))
@@ -370,4 +354,151 @@ plot.plot_all_mutable_features(rs, unprivileged_group, privileged_group, dataset
 sns.set(rc={'figure.figsize':(20.7,8.27)})
 plot.boxplot(rss, unprivileged_group, privileged_group)
 # -
+
+# # Notions of Fairness
+
+# +
+# Compare different notions of fairness
+
+data = dataset()
+learners = [("no constraint", LogisticLearner(exclude_protected=True)),
+            ("statistical parity", RejectOptionsLogisticLearner([privileged_group], [unprivileged_group])),
+            ("AvOdds", RejectOptionsLogisticLearner([privileged_group], [unprivileged_group], metric_name='Average odds difference'))]
+
+# execute
+rss = list(map(lambda x: (x[0],do_sim(x[1])), learners))
+
+# save
+save(rss, "notions_of_fairness_2")
+# + {}
+# load
+rss = load("notions_of_fairness_2")
+
+for name, rs in rss:
+    display(Markdown("## " + name))
+    #plot.plot_all_mutable_features(rs, unprivileged_group, privileged_group, dataset, all_mutable, name=name)
+    
+plot.boxplot(rss, unprivileged_group, privileged_group)
+
+# -
+
+
+
+
+# ## Statistical parity comparison
+# with protected attributes included, otherwise it's boring...
+#
+# gtdiff: difference of averages (of priv and unpriv) of the new ground truth (assigned by KNN with custom cost function as distance)
+
+# +
+data = dataset()
+
+COST_CONST = 8.
+learners = [("baseline", LogisticLearner(exclude_protected=False)),
+    ("pre", ReweighingLogisticLearner([privileged_group], [unprivileged_group])),
+    ("in",FairLearnLearner([privileged_group], [unprivileged_group])),
+    ("post",RejectOptionsLogisticLearner([privileged_group], [unprivileged_group]))]
+
+# execute
+rss = list(map(lambda x: (x[0],do_sim(x[1], no_neighbors=60)), learners))
+
+# save
+save(rss, "statpar_comp_cost2_ra")
+
+# -
+
+
+
+# +
+# load
+rss = load("statpar_comp_cost2_ra")
+df = rss[0][1].results[0].df
+print(np.mean(df.loc[df['age'] == 1,'credit_h_pr']))
+for ft in all_mutable:
+    for name, rs in rss:
+        #display(Markdown("## " + name))
+        #if name == 'post':
+        #print(rs.feature_table([unprivileged_group, privileged_group]))
+        plot.plot_all_mutable_features(rs, unprivileged_group, privileged_group, dataset, [ft], name=name, kind='cdf')
+
+plot.boxplot(rss, unprivileged_group, privileged_group)
+
+# +
+# load
+rss = load("statpar_comp_cost12_2")
+
+for name, rs in rss:
+    display(Markdown("## " + name))
+    #if name == 'post':
+    plot.plot_all_mutable_features(rs, unprivileged_group, privileged_group, dataset, ['month'], name=name, kind='cdf')
+    
+plot.boxplot(rss, unprivileged_group, privileged_group)
+# -
+
+# ## Time of Intervention
+#
+# - Pre: assigning a fixed cost of -subsidy to unprivileged group
+# - Post: setting the bounds for acceptable statistical parity difference to 1-subsidy (high subsidy means stat parity diff must be 0)
+
+data = dataset()
+data.feature_names.index('age')
+
+
+
+# +
+data = dataset()
+
+metric_name = 'statpar' # statpar, gtdiff
+subsidies = np.linspace(0,1,4)
+
+learner = LogisticLearner(exclude_protected=False)
+
+# creates a instance dependant cost lambda fn
+# which reduces cost for unprivileged group by subsidy
+def cost_fixed_dependant(subsidy):
+    group_attr_ind = data._ft_index(group_attr)
+    privileged_val = privileged_group[group_attr]
+
+    return lambda x: cost_fixed(1)[0] if x[group_attr_ind] == privileged_val else cost_fixed(1)[0] - subsidy*1.
+
+
+result_sets = list(map(lambda s: do_sim(learner, cost_fixed_dep=cost_fixed_dependant(s), collect_incentive_data=True), subsidies))
+
+#for rs in result_sets:
+    #display(rs.feature_table([unprivileged_group, privileged_group]))
+    #print(rs)
+
+result_sets += list(map(lambda s: do_sim(RejectOptionsLogisticLearner([privileged_group], [unprivileged_group], abs_bound=s)), reversed(subsidies)))
+
+
+y_values = list(map(lambda rs: extract_metric(rs, metric_name), result_sets))
+index = ['pre'] * len(subsidies) + ['post'] * len(subsidies)
+
+x = np.array([np.hstack((subsidies,subsidies)), y_values]).transpose()
+#x = np.array([subsidies, y_values]).transpose()
+
+# subsidy graph
+plot_data_df = pd.DataFrame(x, columns=['subsidy', metric_name],index=index).reset_index()
+plt.figure()
+ax = sns.lineplot(x='subsidy',hue='index', y=metric_name, data=plot_data_df)
+
+# benefit, cost, incentive_mean graph
+#for rs in result_sets:
+#    d = rs.results[0].incentives
+#    index = 147 #np.argmax(np.array(d[0][0])[:,3] - np.array(d[len(d)-1][0])[:,3])
+#    savings = list(starmap(lambda i,x: [i, np.mean(x[0][:,3])], zip(range(len(d)), d)))
+#    benefit = list(starmap(lambda i,x: [i, np.mean(x[1])], zip(range(len(d)), d)))
+#    incentive_mean = list(starmap(lambda i,x: [i, np.mean(x[1])-np.mean(x[2])], zip(range(len(d)), d)))
+#    cost = list(starmap(lambda i,x: [i, np.mean(x[2])], zip(range(len(d)), d)))
+#    df = pd.DataFrame(data=(np.vstack((savings,benefit,cost,incentive_mean))), columns=["t", "val"], index=(["savings"]*len(d) + ["benefit"]*len(d) + ["cost"] * len(d)+ ["incentive_mean"] * len(d))).reset_index()
+#    plt.figure()
+#    ax = sns.lineplot(x='t', y="val", hue='index',data=df)
+
+
+plt.show()
+#for rs in result_sets:
+#    ax = sns.lineplot(x=mutable_attr, y="incentive",hue=group_attr,data=(rs.                     _avg_incentive(mutable_attr, group_attr)).reset_index())
+#    plt.show()
+# -
+
 
