@@ -84,6 +84,7 @@ def softmax(x1, x2):
 
 # /len(all_mutable)
 all_mutable = mutable_monotone_pos + mutable_monotone_neg + mutable_dontknow + categorical
+all_mutable_dedummy = list(set(list(map(lambda s: s.split('=')[0], all_mutable))))
 COST_CONST = 12. #len(all_mutable)
 c_pos = lambda x_new, x, rank: softmax((rank(x_new)-rank(x)), 0.)/COST_CONST
 c_neg = lambda x_new, x, rank: softmax((rank(x)-rank(x_new)), 0.)/COST_CONST
@@ -91,16 +92,11 @@ c_cat = lambda x_new, x, rank: np.abs(rank(x_new)-rank(x))/COST_CONST
 c_immutable = lambda x_new, x, rank: np.abs(x_new-x)*np.nan_to_num(float('inf'))
 
 
-print(len(all_mutable))
-
-
-
 # -
 
 # ## Common simulation code
 
 # +
-
 def dataset():
     return GermanSimDataset(mutable_features=all_mutable,
             domains={k: 'auto' for k in all_mutable},
@@ -140,33 +136,66 @@ def load(filename):
     return rs
 
 
+# -
+
+C_EXECUTE = True
+
 # # Notions of Fairness
 
 # +
 # Compare different notions of fairness
 
 data = dataset()
-COST_CONST = 2
+COST_CONST = 8
 data = dataset()
-learners = [("no constraint", RejectOptionsLogisticLearner([privileged_group], [unprivileged_group]))]
+learners = [("no constraint", LogisticLearner(exclude_protected=True)),
+            ("statistical parity", RejectOptionsLogisticLearner([privileged_group], [unprivileged_group])),
+            ("AvOdds", RejectOptionsLogisticLearner([privileged_group], [unprivileged_group], metric_name='Average odds difference'))]
 
-# execute
-rss = list(map(lambda x: (x[0],do_sim(x[1], no_neighbors=60)), learners))
-print(rss[0][1].feature_table([unprivileged_group, privileged_group]))
-print(rss[0][1])
-# -
 
-plot.plot_all_mutable_features(rss[0][1], unprivileged_group, privileged_group, dataset, all_mutable, kind='cdf')
+if C_EXECUTE:
+    # execute
+    rss = list(map(lambda x: (x[0],do_sim(x[1], no_neighbors=60)), learners))
+    # save
+    save(rss, "notions_of_fairness_" + str(COST_CONST))
 
 # +
-rss = load("statpar_comp_cost_6")
+rss = load("notions_of_fairness_8")
 
-for name, rs in rss:
-    display(Markdown("## " + name))
-    plot.plot_all_mutable_features(rs, unprivileged_group, privileged_group, dataset, ['month'], name=name, kind='cdf')
+for ft in all_mutable_dedummy:
+    for name, rs in rss:
+        display(Markdown("#### " + ft + ", " + name))
+        plot.plot_all_mutable_features(rs, unprivileged_group, privileged_group, dataset, [ft], name=name, kind='cdf')
 
 plot.boxplot(rss, unprivileged_group, privileged_group)
 
+# -
+# # Statistical Parity Comparison
+
+# +
+data = dataset()
+COST_CONST = 8
+learners = [("baseline", LogisticLearner(exclude_protected=False)),
+    ("pre", ReweighingLogisticLearner([privileged_group], [unprivileged_group])),
+    ("in",FairLearnLearner([privileged_group], [unprivileged_group])),
+    ("post",RejectOptionsLogisticLearner([privileged_group], [unprivileged_group]))]
+
+if C_EXECUTE:
+    # execute
+    rss = list(map(lambda x: (x[0],do_sim(x[1], no_neighbors=60)), learners))
+    # save
+    save(rss, "statpar_comp_cost_" + str(COST_CONST))
+
+
+# +
+rss = load("statpar_comp_cost_8")
+
+for ft in all_mutable_dedummy:
+    for name, rs in rss:
+        display(Markdown("#### " + ft + ", " + name))
+        plot.plot_all_mutable_features(rs, unprivileged_group, privileged_group, dataset, [ft], name=name, kind='cdf')
+
+plot.boxplot(rss, unprivileged_group, privileged_group)
 # -
 
 
