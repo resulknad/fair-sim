@@ -356,7 +356,7 @@ for i in range(10):
 plot.boxplot(rss, unprivileged_group, privileged_group)
 
 # save
-save(rss, "cost_const_ro_statpar")
+save(rss, "colorblind_sighted_" + str(Cos))
 
 # +
 # load

@@ -199,3 +199,31 @@ plot.boxplot(rss, unprivileged_group, privileged_group)
 # -
 
 
+
+# # Colorblind vs Colorsighted
+
+# +
+data = dataset()
+COST_CONST = 8
+
+learners = [("logreg cb", LogisticLearner(exclude_protected=True)),
+    ("logreg cs", LogisticLearner(exclude_protected=False)),
+    ("nb cb",GaussianNBLearner(exclude_protected=True)),
+    ("nb cs",GaussianNBLearner(exclude_protected=False))]
+
+if C_EXECUTE:
+    # execute
+    rss = list(map(lambda x: (x[0],do_sim(x[1], no_neighbors=60)), learners))
+    # save
+    save(rss, "colorsigted_blind_" + str(COST_CONST))
+
+
+# +
+rss = load("colorsigted_blind_8")
+
+for ft in all_mutable_dedummy:
+    for name, rs in rss:
+        display(Markdown("#### " + ft + ", " + name))
+        plot.plot_all_mutable_features(rs, unprivileged_group, privileged_group, dataset, [ft], name=name, kind='cdf')
+
+plot.boxplot(rss, unprivileged_group, privileged_group)

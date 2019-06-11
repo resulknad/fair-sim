@@ -1,4 +1,7 @@
 from sklearn.naive_bayes import GaussianNB
+from .utils import _drop_protected
+import numpy as np
+
 class GaussianNBLearner(object):
     threshold = 0.5
     def __init__(self, exclude_protected=False):
