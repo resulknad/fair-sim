@@ -68,10 +68,12 @@ class RejectOptionsLogisticLearner(object):
                 wrongly_flipped = (x[bool_increased,grp_ind] != unpriv_val).sum()
                 if wrongly_flipped > 0:
                     raise Warning("RO flipped " + str(wrongly_flipped) + " labels (0 to 1) for privileged group")
-                max_increase = (thresh-scores[bool_increased]).max()
+                #max_increase = (thresh-scores[bool_increased]).max()
+                max_increase = ro.ROC_margin
                 self.max_increase = max_increase
                 #print("Increase", max_increase)
                 #scores[x[:,grp_ind]==unpriv_val] += max_increase + 0.00001
+
                 scores[bool_increased[0]] += max_increase + 0.00001
 
 
@@ -82,11 +84,14 @@ class RejectOptionsLogisticLearner(object):
                 wrongly_flipped = (x[bool_decreased,grp_ind] != priv_val).sum()
                 if wrongly_flipped > 0:
                     raise Warning("RO flipped " + str(wrongly_flipped) + " labels (1 to 0) for unprivileged group out of" + str(len(list(bool_decreased[0]))))
-                max_decrease = (scores[bool_decreased] - thresh).max()
+                #max_decrease = (scores[bool_decreased] - thresh).max()
+                max_decrease = ro.ROC_margin
                 self.max_decrease = max_decrease
                 #scores[x[:,grp_ind]==priv_val] -= max_decrease + 0.000001
                 scores[bool_decreased[0]] -= max_decrease + 0.00001
                 #print("Decrease", max_decrease)
+
+            print("increased:", bool_increased[0])
 
             boosted_pred = np.array(np.where(boosted_pred)[0])
             score_pred = np.array(np.where(scores>=thresh)[0])

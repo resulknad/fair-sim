@@ -60,19 +60,18 @@ def plot_ga(rs, index):
     incentive_mean = list(starmap(lambda i,x: [i, np.mean(x['benefit'])-np.mean(x['cost'])], zip(range(len(d)), d)))
     cost = list(starmap(lambda i,x: [i, np.mean(x['cost'][index])], zip(range(len(d)), d)))
     df = pd.DataFrame(data=(np.vstack((savings,
-                                       benefit,
-                                       cost,
+                                       benefit))),
+                                       #cost))),
                                        #incentive_mean,
-                                       boost))),
+                                       #boost))),
                       columns=["t", "val"],
                       index=(["month"]*len(d)
-                             + ["benefit"]*len(d)
-                             + ["cost"] * len(d)
+                             + ["benefit"]*len(d))).reset_index()
+                             #+ ["cost"] * len(d))).reset_index()
                              #+ ["incentive_mean"] * len(d)
-                             + ["boost"] * len(d))).reset_index()
+                             #+ ["boost"] * len(d))).reset_index()
     plt.figure()
     ax = sns.lineplot(x='t', y="val", hue='index',data=df)
-    display(d['features'][index,:])
     plt.show()
 
 
@@ -163,7 +162,7 @@ def plot_all_mutable_features(rs, unprivileged_group, privileged_group, dataset,
         #print(ax.get_xlabel())
 
         ax.set(ylabel=ylabel, xlabel=ax.get_xlabel().replace('_', ' '))
-        ax.set_xticklabels(ax.get_xticklabels(),rotation=60)
+        ax.set_xticklabels(ax.get_xticklabels(),rotation=90)
         ax.legend(handles=handles[0:], labels=modify_legend(labels[0:]))
         pp = PdfPages(name + '_' + ax.get_xlabel() +'.pdf')
         pp.savefig(bbox_inches="tight")

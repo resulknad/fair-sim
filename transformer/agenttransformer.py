@@ -125,6 +125,7 @@ class AgentTransformer(Transformer):
 
         def collect_incentive_data(X):
             if self.collect_incentive_data:
+                mask = X[:,6] == 0
                 #gradient_benefit, _ = approx_fprime(X, a.benefit, eps, immutable=immutable)
                 #def bf(x):
                 #    return a.benefit(x, boost=False)

@@ -174,21 +174,26 @@ plot.boxplot(rss, unprivileged_group, privileged_group)
 
 # +
 data = dataset()
-COST_CONST = 8
-learners = [("baseline", LogisticLearner(exclude_protected=False)),
-    ("pre", ReweighingLogisticLearner([privileged_group], [unprivileged_group])),
-    ("in",FairLearnLearner([privileged_group], [unprivileged_group])),
+COST_CONST = 2
+learners = [#("baseline", LogisticLearner(exclude_protected=False)),
+    #("pre", ReweighingLogisticLearner([privileged_group], [unprivileged_group])),
+    #("in",FairLearnLearner([privileged_group], [unprivileged_group])),
     ("post",RejectOptionsLogisticLearner([privileged_group], [unprivileged_group]))]
 
 if C_EXECUTE:
     # execute
-    rss = list(map(lambda x: (x[0],do_sim(x[1], no_neighbors=60)), learners))
+    rss = list(map(lambda x: (x[0],do_sim(x[1], no_neighbors=60, collect_incentive_data=True)), learners))
     # save
     save(rss, "statpar_comp_cost_" + str(COST_CONST))
+# -
+
+
+plot.plot_ga(rss[0][1], 869)
 
 
 # +
-rss = load("statpar_comp_cost_8")
+
+rss = load("statpar_comp_cost_2")
 
 for ft in all_mutable_dedummy:
     for name, rs in rss:
@@ -227,3 +232,6 @@ for ft in all_mutable_dedummy:
         plot.plot_all_mutable_features(rs, unprivileged_group, privileged_group, dataset, [ft], name=name, kind='cdf')
 
 plot.boxplot(rss, unprivileged_group, privileged_group)
+# -
+
+
