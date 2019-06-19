@@ -17,14 +17,14 @@ class FairLearnLearner(object):
         assert((self.privileged_group[0].keys()==self.unprivileged_group[0].keys()))
         class_attr = list(self.privileged_group[0].keys())[0]
 
-        reg = LogisticRegression(solver='liblinear',max_iter=1000000000, C=1000000000000000000000.0)
+        reg = LogisticRegression(solver='liblinear',max_iter=1000000000)
 
         class_ind = dataset.feature_names.index(class_attr)
         X = pd.DataFrame(dataset.features)
         A = pd.Series(dataset.features[:,class_ind])
         Y = pd.Series(dataset.labels.ravel())
 
-        bc = expgrad(X, A, Y, reg, nu=2.9e-12, cons=DP()).best_classifier
+        bc = expgrad(X, A, Y, reg, nu=1, cons=DP()).best_classifier
         bc_binary = lambda x: (list(bc(x) > 0.5))
 
         self.bc = bc

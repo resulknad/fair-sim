@@ -31,6 +31,7 @@ class SimpleDataset(BinaryLabelDataset, SimMixin):
         self.means = kwargs.pop('means', [45,60])
         self.N = kwargs.pop('N', 1000)
         self.threshold = kwargs.pop('threshold', 55)
+        self.human_readable_labels ={}
 
         df = self._generateData(means=self.means, N=self.N, threshold=self.threshold)
 

@@ -12,7 +12,8 @@ import numpy as np
 import pandas as pd
 import uuid
 
-# copied from SCIKIT OPTIMIZE
+# copied from SCIKIT OPTIMIZE and modified:
+# approximates the gradient of a multivariate function using central differences
 def approx_fprime(xk, f, epsilon, args=(), f0=None, immutable=[]):
     if f0 is None:
         f0 = f(*((xk,) + args))
@@ -21,55 +22,34 @@ def approx_fprime(xk, f, epsilon, args=(), f0=None, immutable=[]):
     ei = np.zeros(xk.shape, float)
     for k in range(n_features):
         if k not in immutable:
+            # approx gradient for all n_instances for feature k
             ei[:,k] = 1.0
             d = epsilon * ei
-#            print("d shape", d.shape, "xk shape", xk.shape)
             grad[:,k] = (f(*((xk + d*0.5,) + args)) - f(*((xk - d*0.5,) + args))) / d[0][k]
-            #grad[:,k] = (-f(*((xk - d,) + args)) + f0) / d[0][k]
-#            grad[:,k] = (-f(*((xk - d,) + args)) + f0) / d[0][k]
             ei[:,k] = 0.0
 
-    #grad = grad/np.linalg.norm(grad, ord=1, axis=1, keepdims=True)
     return grad, f0
-
-def approx_fprime_exact(xk, f, epsilon, args=(), f0=None, immutable=[]):
-    if f0 is None:
-        f0 = f(*((xk,) + args))
-    n_instances, n_features = xk.shape
-    grad = np.zeros(xk.shape, float)
-    ei = np.zeros(xk.shape, float)
-    for k in range(n_features):
-        if k not in immutable:
-            for l in range(n_instances):
-                ei[l,k] = 1.0
-                d = epsilon * ei
-#                print("d shape", d.shape, "xk shape", xk.shape)
-                grad[l,k] = ((f(*((xk + d*0.5,) + args)) - f(*((xk - d*0.5,) + args))) / d[l][k])[l]
-                #grad[:,k] = (-f(*((xk - d,) + args)) + f0) / d[0][k]
-    #            grad[:,k] = (-f(*((xk - d,) + args)) + f0) / d[0][k]
-                ei[l,k] = 0.0
-
-    #grad = grad/np.linalg.norm(grad, ord=1, axis=1, keepdims=True)
-    return grad, f0
-
-#def fn(X):
-#    if not X[1][0] == 2:
-#        return X.ravel()*2
-#    else:
-#        return X.ravel()*3
-#print(approx_fprime(np.array([[1],[2],[3]]), fn, 0.01))
-#print(approx_fprime_exact(np.array([[1],[2],[3]]), fn, 0.01))
 
 class AgentTransformer(Transformer):
-# this class is not thread safe
-    def __init__(self, agent_class, h, cost_distribution, scaler, no_neighbors=51, collect_incentive_data=False, avg_out_incentive=1, cost_distribution_dep=None, use_rank=True):
+    """Performs manipulation of feature vectors in response to hypothesis from learner.
 
-        self.avg_out_incentive = avg_out_incentive
-        self.use_rank = True
+    :param agent_class: Class defining benefit and cost functions
+    :param h: Learners best response to dataset.
+    :param cost_distribution: Distribution function for fixed cost (indpendent of features), e.g. lambda size: np.random.normal(mu, sigma, size)
+    :param cost_distribution_dep: Distribution function for fixed cost (dependent on features), e.g. lambda x: 1 if x[0] == 'black' else 0, parameter is simply the feature vector of one instance
+    :param cost_distribution_dep: Distribution function for fixed cost (dependent on features), e.g. lambda x: 1 if x[0] == 'black' else 0, parameter is simply the feature vector of one instance
+    :param no_neighbors: Number of neighbors to consider in KNN for ground truth update
+    :param collect_incentive_data: Collect debugging information during gradient ascend
+    :param max_it: Maximum iterations for gradient ascend
+
+    """
+# this class is not thread safe
+    def __init__(self, agent_class, h, cost_distribution, no_neighbors=51, collect_incentive_data=False, cost_distribution_dep=None, max_it=130):
         self.agent_class = agent_class
         self.h = h
         self.cost_distribution = cost_distribution
         self.no_neighbors = no_neighbors
+        self.max_it = max_it
         self.collect_incentive_data = collect_incentive_data
         self.cost_distribution_dep = cost_distribution_dep
         self.incentives = []
@@ -80,13 +60,8 @@ class AgentTransformer(Transformer):
             cost_distribution=cost_distribution)
 
     def _optimal_x_gd(self, dataset, cost):
-
+        # approximates best-response for agent using gradient ascend
         X = dataset.features
-        #print(np.where(X[:,36]>0.8))
-        #print(X[4,36])
-        #print(dataset.feature_names[36])
-        #print(dataset.feature_names.index('property=A124'))
-
         y = dataset.labels
 
         assert(len(dataset.protected_attribute_names)==1)
@@ -96,12 +71,9 @@ class AgentTransformer(Transformer):
         a = self.agent_class(self.h, dataset, cost, np.copy(X), y)
         a.threshold = self.h.threshold
 
-        # max tracking
-        #print(x)
-
         eps = 0.05
         gradient,incentive = approx_fprime(X, a.incentive, eps, immutable=immutable)
-        print(gradient.shape)
+        #print(gradient.shape)
 
         #print(gradient)
         #print("incentive", a.incentive(x))
@@ -134,7 +106,9 @@ class AgentTransformer(Transformer):
                 self.incentives.append({'features': X,
                     'benefit': a.benefit(X),
                     'cost': a.cost(X),
-                    'boost': 0.})#self.h.max_increase})
+                    'boost': 0.,
+                    'names': dataset.feature_names})#self.h.max_increase})
+
                 #    'benefit_grad': gradient_benefit[np.where(X[:,6] == 0)],
                 #    'benefit_grad_wob': gradient_benefit_wob[np.where(X[:,6] == 0)]})
 
@@ -142,7 +116,7 @@ class AgentTransformer(Transformer):
 
         print("starting GA")
         incentive_last = 0
-        MAXIT = self.no_neighbors
+        MAXIT = self.max_it
         for i in range(MAXIT):
             #print(i,"\t",self.h.debug_info())
 
@@ -158,6 +132,8 @@ class AgentTransformer(Transformer):
             #print("inc",a.benefit(X)[4])
 
             gradient, incentive = approx_fprime(X, a.incentive, eps, immutable=immutable)
+            #gradient_benefit, _ = approx_fprime(X, a.benefit, eps, immutable=immutable)
+            #print("A40: ", np.mean(gradient_benefit[:,dataset.feature_names.index('purpose=A40')]),"A41: ", np.mean(gradient_benefit[:,dataset.feature_names.index('purpose=A41')]))
 
             #rel_x = list(X[147])
 

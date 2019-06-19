@@ -1,4 +1,6 @@
 import matplotlib.pyplot as plt
+from IPython.display import display, Markdown, Latex
+
 from itertools import starmap
 import numpy as np
 from functools import reduce
@@ -50,23 +52,26 @@ def print_logreg_coeffs(data):
     display(Markdown("#### LogReg Coeffs."))
     display(pd.DataFrame(columns=['Feature', 'Coefficient LogReg'], data=l.coefs))
 
-def plot_ga(rs, index):
+def plot_ga(rs, index, features):
     # benefit, cost, incentive_mean graph
     d = rs.results[0].incentives
     #np.argmax(np.array(d[0][0])[:,3] - np.array(d[len(d)-1][0])[:,3])
-    savings = list(starmap(lambda i,x: [i, np.mean(x['features'][:,1][index])], zip(range(len(d)), d)))
+    feature_ind = list(map(d[0]['names'].index, features))
+    extracted_features = np.array(list(map(lambda ft_ind: list(starmap(lambda i,x: [i, np.mean(x['features'][:,ft_ind])], zip(range(len(d)), d))), feature_ind))).reshape(-1,2)
+
     benefit = list(starmap(lambda i,x: [i, np.mean(x['benefit'][index])], zip(range(len(d)), d)))
     boost = list(starmap(lambda i,x: [i, x['boost']], zip(range(len(d)), d)))
     incentive_mean = list(starmap(lambda i,x: [i, np.mean(x['benefit'])-np.mean(x['cost'])], zip(range(len(d)), d)))
     cost = list(starmap(lambda i,x: [i, np.mean(x['cost'][index])], zip(range(len(d)), d)))
-    df = pd.DataFrame(data=(np.vstack((savings,
+
+    indx = np.array(list(map(lambda a: [a]*len(d), [*features,'benefit']))).ravel()
+    df = pd.DataFrame(data=(np.vstack((extracted_features,
                                        benefit))),
                                        #cost))),
                                        #incentive_mean,
                                        #boost))),
                       columns=["t", "val"],
-                      index=(["month"]*len(d)
-                             + ["benefit"]*len(d))).reset_index()
+                      index=(indx)).reset_index()
                              #+ ["cost"] * len(d))).reset_index()
                              #+ ["incentive_mean"] * len(d)
                              #+ ["boost"] * len(d))).reset_index()
@@ -78,7 +83,7 @@ def plot_ga(rs, index):
 def plot_distribution(dataset, dist_plot_attr):
     dataset.infer_domain()
     fns = dataset.rank_fns()
-    sample = np.linspace(-1,10,100)
+    sample = np.linspace(-1,1,100)
     data_arr = list(map(fns[0][dist_plot_attr], sample))
     data_arr.extend(list(map(fns[1][dist_plot_attr], sample)))
     data_arr = np.array([np.hstack((sample,sample)), data_arr]).transpose()
@@ -153,7 +158,7 @@ def plot_all_mutable_features(rs, unprivileged_group, privileged_group, dataset,
                 for time in ['0_0', '0_1', '1_0','1_1']:
                     mask = merged['time'] == time
                     merged.loc[mask,'index'] = merged.loc[mask,'index'].cumsum()
-            ax = sns.pointplot(x=mutable_attr, hue="time", y="index",
+            ax = sns.pointplot(scale=0.75,x=mutable_attr, hue="time", y="index",
                         data=merged, palette=palette, linestyles=['-','--','-','--'])
         else:
             ax = sns.barplot(x=mutable_attr, hue="time", y="index",
@@ -164,7 +169,7 @@ def plot_all_mutable_features(rs, unprivileged_group, privileged_group, dataset,
         ax.set(ylabel=ylabel, xlabel=ax.get_xlabel().replace('_', ' '))
         ax.set_xticklabels(ax.get_xticklabels(),rotation=90)
         ax.legend(handles=handles[0:], labels=modify_legend(labels[0:]))
-        pp = PdfPages(name + '_' + ax.get_xlabel() +'.pdf')
+        pp = PdfPages('figures/' + name + '_' + ax.get_xlabel() +'.pdf')
         pp.savefig(bbox_inches="tight")
         pp.close()
         plt.show()
@@ -186,7 +191,7 @@ def merge_result_sets(rss, unprivileged_group, privileged_group, ft_name):
     plot_data_df = pd.DataFrame(plot_data, columns=["name", "time", ft_name])
     return plot_data_df
 
-def boxplot(rss, up, p):
+def boxplot(rss, up, p, name=''):
     ft_name = 'credit_h_pr'
     plot_data_df = merge_result_sets(rss, up, p, ft_name)
     sns.set_style("whitegrid")
@@ -195,12 +200,17 @@ def boxplot(rss, up, p):
     ax = sns.boxplot(x="name", y=ft_name, hue="time",
                 data=plot_data_df, palette=palette)
 
-    pp = PdfPages('notions_of_fairness.pdf')
+
+
+
+    pp = PdfPages('figures/' + name + '.pdf')
     handles, labels = ax.get_legend_handles_labels()
     print(ax.get_xlabel())
     ax.set(ylabel='benefit', xlabel=ax.get_xlabel().replace('_', ' '))
     ax.set_xticklabels(ax.get_xticklabels(),rotation=0)
-    ax.legend(handles=handles[0:], labels=modify_legend(labels[0:]))
+    ax.legend(bbox_to_anchor=(0., 1.02, 1., .102), loc=3,
+           ncol=2, mode="expand", borderaxespad=0., handles=handles[0:], labels=modify_legend(labels[0:]))
+
     pp.savefig(bbox_inches="tight")
     pp.close()
     plt.show()

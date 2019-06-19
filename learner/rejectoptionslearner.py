@@ -2,6 +2,7 @@ import numpy as np
 from utils import dataset_from_matrix
 from .utils import _accuracy
 from sklearn.linear_model import LogisticRegression
+from scipy.special import expit
 from aif360.algorithms.postprocessing.reject_option_classification import RejectOptionClassification
 
 class RejectOptionsLogisticLearner(object):
@@ -19,7 +20,7 @@ class RejectOptionsLogisticLearner(object):
         return str(self.threshold) + "\t" + str(self.max_increase) + "\t" + str(self.max_decrease) + "\t" + str(self.no_increased)
 
     def fit(self, dataset):
-        reg = LogisticRegression(solver='liblinear',max_iter=1000000000, C=1000000000000000000000.0).fit(dataset.features, dataset.labels.ravel())
+        reg = LogisticRegression(solver='liblinear',max_iter=1000000000).fit(dataset.features, dataset.labels.ravel())
 
         dataset_p = dataset.copy(deepcopy=True)
         dataset_p.scores = np.array(list(map(lambda x: [x[1]],reg.predict_proba(dataset.features))))
@@ -50,6 +51,7 @@ class RejectOptionsLogisticLearner(object):
         def h_pr(x,boost=True):
             thresh = ro.classification_threshold
             scores = np.array(list(map(lambda x:x[1], reg.predict_proba(x))))
+            scores_ = np.array(list(map(lambda x:x[1], reg.predict_proba(x))))
             orig_pred = list(map(lambda x: x[1] > thresh, reg.predict_proba(x)))
             boosted_pred = h(x)
 
@@ -59,44 +61,30 @@ class RejectOptionsLogisticLearner(object):
             _, priv_val = list(self.privileged_group[0].items())[0]
             grp_ind = dataset.feature_names.index(group_ft)
 
+            priv_ind = x[:,grp_ind] != unpriv_val
+            unpriv_ind = x[:,grp_ind] == unpriv_val
 
-            bool_increased = np.where(changed == 1)
-            max_increase = 0.
-            if np.array(bool_increased).any():
-                #print(bool_increased[0])
-                self.no_increased = len(bool_increased[0])
-                wrongly_flipped = (x[bool_increased,grp_ind] != unpriv_val).sum()
-                if wrongly_flipped > 0:
-                    raise Warning("RO flipped " + str(wrongly_flipped) + " labels (0 to 1) for privileged group")
-                #max_increase = (thresh-scores[bool_increased]).max()
-                max_increase = ro.ROC_margin
-                self.max_increase = max_increase
-                #print("Increase", max_increase)
-                #scores[x[:,grp_ind]==unpriv_val] += max_increase + 0.00001
+            lower_bound = ro.classification_threshold - ro.ROC_margin -0.1
+            upper_bound = ro.classification_threshold + ro.ROC_margin + 0.1
+            #print(upper_bound)
 
-                scores[bool_increased[0]] += max_increase + 0.00001
+            def booster_fn(scores):
+                return (expit(100*(scores - lower_bound)) - expit(100*(scores - upper_bound))) * ro.ROC_margin
 
+            scores[priv_ind] -= booster_fn(scores[priv_ind])
+            scores[unpriv_ind] += booster_fn(scores[unpriv_ind])
 
-            bool_decreased = np.where(changed == -1)
-            max_decrease = 0.
-            if np.array(bool_decreased).any():
-                #print(ro.classification_threshold - ro.ROC_margin)
-                wrongly_flipped = (x[bool_decreased,grp_ind] != priv_val).sum()
-                if wrongly_flipped > 0:
-                    raise Warning("RO flipped " + str(wrongly_flipped) + " labels (1 to 0) for unprivileged group out of" + str(len(list(bool_decreased[0]))))
-                #max_decrease = (scores[bool_decreased] - thresh).max()
-                max_decrease = ro.ROC_margin
-                self.max_decrease = max_decrease
-                #scores[x[:,grp_ind]==priv_val] -= max_decrease + 0.000001
-                scores[bool_decreased[0]] -= max_decrease + 0.00001
-                #print("Decrease", max_decrease)
+            assert((scores != scores_).any())
 
-            print("increased:", bool_increased[0])
 
             boosted_pred = np.array(np.where(boosted_pred)[0])
             score_pred = np.array(np.where(scores>=thresh)[0])
             diff = np.setdiff1d(boosted_pred, score_pred)
-            assert(len(diff)==0)
+
+            #print(ro.classification_threshold, ro.ROC_margin)
+            #print(diff, scores[diff], scores_[diff])
+            #print(booster_fn(scores_[diff]))
+            #assert(len(diff)==0)
 
 
 

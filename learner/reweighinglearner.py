@@ -22,7 +22,7 @@ class ReweighingLogisticLearner(object):
 
         #reg_ = LogisticRegression(solver='liblinear',max_iter=1000000000, C=1000000000000000000000.0).fit(dataset_.features, dataset_.labels.ravel())
 
-        reg = LogisticRegression(solver='liblinear',max_iter=1000000000, C=1000000000000000000000.0).fit(dataset_.features, dataset_.labels.ravel(), sample_weight=dataset_.instance_weights)
+        reg = LogisticRegression(solver='liblinear',max_iter=1000000000).fit(dataset_.features, dataset_.labels.ravel(), sample_weight=dataset_.instance_weights)
         #print("reweighted",sorted(list(zip(dataset.feature_names,reg.coef_[0])),key=lambda x: abs(x[1])))
 
         #print(sorted(list(zip(dataset.feature_names,reg.coef_[0])),key=lambda x: abs(x[1])))

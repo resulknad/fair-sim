@@ -8,9 +8,10 @@ class LogisticLearner(object):
 
     def fit(self, dataset):
         self.dataset = dataset
-        reg = LogisticRegression(solver='liblinear',max_iter=1000000000, C=1000000000000000000000.0).fit(self.drop_prot(dataset, dataset.features), dataset.labels.ravel())
-
-        self.coefs = (sorted(list(zip(dataset.feature_names,reg.coef_[0])),key=lambda x: -abs(x[1])))
+        reg = LogisticRegression(solver='liblinear',max_iter=1000000000).fit(self.drop_prot(dataset, dataset.features), dataset.labels.ravel())
+        ft_names = self.drop_prot(dataset, np.array(dataset.feature_names).reshape(1,-1)).ravel()
+        self.coefs = (sorted(list(zip(ft_names,reg.coef_[0])),key=lambda x: -abs(x[1])))
+        #print(list(filter(lambda a: a[0].startswith('purpose'), self.coefs)))
 
         self.h = reg
         return None

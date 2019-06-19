@@ -1,4 +1,8 @@
 __pycache__
 statpar_*
 notions_*
+calib_*
+figures/
 *.pdf
+simple_*
+colorsi*
