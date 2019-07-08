@@ -57,6 +57,7 @@ def print_logreg_coeffs(data):
     display(Markdown("#### LogReg Coeffs."))
     display(pd.DataFrame(columns=['Feature', 'Coefficient LogReg'], data=l.coefs))
 
+# plots debugging information for gradient ascend
 def plot_ga(rs, index, features):
     # benefit, cost, incentive_mean graph
     d = rs.results[0].incentives
@@ -163,6 +164,8 @@ def prepare_df_feature(rs, unprivileged_group, privileged_group, dataset,mutable
     return merged
 
 
+# plots box and lineplot for feature distribution changes (impacted vs initial)
+# combines different methods (in rss) in one plot
 def plot_all_mutable_features_combined(rss, unprivileged_group, privileged_group, dataset,mutable_attr, filename='a', kind='pdf', select_group='0', barplot_delta=False):
     basecolor = Color('#4286f4' if select_group == '0' else '#f45942')
 
@@ -279,6 +282,7 @@ def plot_all_mutable_features_combined(rss, unprivileged_group, privileged_group
     pp.close()
     plt.show()
 
+# plots initial and impacted for one method
 def plot_all_mutable_features(rs, unprivileged_group, privileged_group, dataset,all_mutable,name='a', kind='pdf', barplot_delta=True):
     sns.set_style("whitegrid")
 

@@ -178,55 +178,7 @@ def load(filename):
 # -
 
 C_EXECUTE = True
-data = dataset()
-
-
-# +
-# stability of calibration...
-def filter_coefs(l):
-    return list(filter(lambda x: x[0].startswith('purpose'), l))
-COST_CONST = 8
-data = dataset()
-rss = []
-if C_EXECUTE:
-    for i in range(1):
-        ll = LogisticLearner(exclude_protected=True)
-        ll.fit(dataset())
-        display(filter_coefs(ll.coefs))
-        cl = CalibratedLogisticLearner([privileged_group], [unprivileged_group])
-        cl.fit(dataset())
-        #display(list(map(filter_coefs, cl.coefs)))
-        rss.append(('logreg', do_sim(LogisticLearner(exclude_protected=True), no_neighbors=1, collect_incentive_data=True)))
-        rss.append(('cll', do_sim(CalibratedLogisticLearner([privileged_group], [unprivileged_group]), no_neighbors=1, collect_incentive_data=True)))
-
-# save
-#save(rss, "calib_expl_" + str(COST_CONST))
-
-
-
-# +
-index = 1
-features = ['purpose=A40', 'purpose=A41']
-rss = load("calib_expl_8")
-
-plot.plot_distribution(dataset(), 'month')
-
-plot.plot_ga(rss[0][1], index, features=features)
-plot.plot_ga(rss[1][1], index, features=features)
-plot.boxplot(rss, unprivileged_group, privileged_group, name="calib_expl_8")
-
-display(rss[0][1].feature_table([unprivileged_group, privileged_group]))
-display(rss[1][1].feature_table([unprivileged_group, privileged_group]))
-
-for ft in all_mutable_dedummy:
-    for name, rs in rss:
-        
-        display(Markdown("#### " + ft + ", " + name))
-        plot.plot_all_mutable_features(rs, unprivileged_group, privileged_group, dataset, [ft], name=name, kind='cdf')
-
-plot.boxplot(rss, unprivileged_group, privileged_group)
-
-# -
+data = False()
 
 # # Notions of Fairness
 
@@ -287,14 +239,6 @@ if C_EXECUTE:
     save(rss, "statpar_comp_cost_bf" + str(COST_CONST))
 
 
-indx = 27
-print(rss[0][1].results[0].df['age'][indx])
-plot.plot_ga(rss[0][1], indx)
-print(rss[0][1].results[0].df_new['credit_h_pr'][indx])
-
-
-dict(zip(dataset().feature_names, rss[0][1].results[0].incentives[61]['features'][indx]-rss[0][1].results[0].incentives[59]['features'][indx]))
-
 # +
 filename = "statpar_comp_cost_bf8"
 rss = load(filename)
@@ -346,5 +290,28 @@ for ft in all_mutable_dedummy:
 
 plot.boxplot(rss, unprivileged_group, privileged_group)
 # -
+# # Debug gradient ascend (plot)
 
+# +
+
+index = 1
+features = ['purpose=A40', 'purpose=A41']
+rss = load("calib_expl_8")
+
+plot.plot_distribution(dataset(), 'month')
+
+plot.plot_ga(rss[0][1], index, features=features)
+plot.plot_ga(rss[1][1], index, features=features)
+plot.boxplot(rss, unprivileged_group, privileged_group, name="calib_expl_8")
+
+display(rss[0][1].feature_table([unprivileged_group, privileged_group]))
+display(rss[1][1].feature_table([unprivileged_group, privileged_group]))
+
+for ft in all_mutable_dedummy:
+    for name, rs in rss:
+        
+        display(Markdown("#### " + ft + ", " + name))
+        plot.plot_all_mutable_features(rs, unprivileged_group, privileged_group, dataset, [ft], name=name, kind='cdf')
+
+plot.boxplot(rss, unprivileged_group, privileged_group)
 
