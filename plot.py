@@ -166,7 +166,9 @@ def prepare_df_feature(rs, unprivileged_group, privileged_group, dataset,mutable
 def plot_all_mutable_features_combined(rss, unprivileged_group, privileged_group, dataset,mutable_attr, filename='a', kind='pdf', select_group='0', barplot_delta=False):
     basecolor = Color('#4286f4' if select_group == '0' else '#f45942')
 
+    sns.set(font_scale=1.5)
     sns.set_style("whitegrid")
+
 
     dfs = []
     palette = {'0_0': '#4286f4', '1_0':'#f45942'}
@@ -199,8 +201,6 @@ def plot_all_mutable_features_combined(rss, unprivileged_group, privileged_group
         palette[name + ' 0_1'] = '#91bbff'
         palette[name + ' 1_1'] = '#ff9282'#'#91bbff'
 
-        # set linestyle
-        linestyles.append((1,(4,1)))
 
         cnt = cnt + 1
 
@@ -220,29 +220,42 @@ def plot_all_mutable_features_combined(rss, unprivileged_group, privileged_group
         ax = sns.pointplot(scale=.4,x=mutable_attr, hue="time", y="index",
                     data=merged,
                     palette=palette,
-                    linestyles=linestyles,
+                    linestyles=['-', '--', '-.', ':', (1,(10,4))],
                     markers=['o','v','^','<','>'])
         ax.set_ylabel('')
     else:
         if barplot_delta:
             ylabel += ' difference'
-        ax = sns.barplot(x=mutable_attr, hue="time", y="index",
-                    data=merged,  palette=itertools.cycle([basecolor.hex]))
+
         num_locations = len(merged[mutable_attr].unique())
+
+        palette_bar = [basecolor.hex]
+        for i in range(num_locations):
+            basecolor.luminance = min(basecolor.luminance + 0.075, 1)
+            palette_bar.append(basecolor.hex)
+
+        ax = sns.barplot(x=mutable_attr, hue="time", y="index",
+                    data=merged,  palette=palette_bar)
+
+
+
         hatches = itertools.cycle(['///', '----', '|||', '\\\\\\'])
         for i, bar in enumerate(ax.patches):
             if i % num_locations == 0:
                 hatch = next(hatches)
-            bar.set_hatch(hatch)
+            #bar.set_hatch(hatch)
         ax.set_ylabel('')
+        # remove gridline at 0
+        yticks = ax.yaxis.get_major_ticks()
+        plt.setp(yticks[np.where(ax.get_yticks() == 0)[0][0]].gridline, visible=False)
 
 
     # change marker size, marker edge color
     edgecolor = 'r' if select_group == '1' else 'b'
-    plt.setp(ax.collections, alpha=0.8, sizes=[30], edgecolors=edgecolor)
+    plt.setp(ax.collections, alpha=0.8, sizes=[160], edgecolors=edgecolor)
 
     # change line opacity
-    plt.setp(ax.lines, alpha=.6)
+    plt.setp(ax.lines, alpha=.9, linewidth=3.0)
 
     ax.set_ylabel('')
 
@@ -253,10 +266,12 @@ def plot_all_mutable_features_combined(rss, unprivileged_group, privileged_group
     ax.set(ylabel=ylabel, xlabel=ax.get_xlabel().replace('_', ' '))
 
     # rotate x axis legend
-    ax.set_xticklabels(ax.get_xticklabels(),rotation=90)
+    ax.set_xticklabels(ax.get_xticklabels(),rotation=70.)
 
     # place legend and change legend text
     ax.legend(handles=handles[0:], labels=modify_legend(labels[0:], remove_all_impacted=True),bbox_to_anchor=(0., 1.02, 1., .102), loc=3, ncol=2, mode='expand')
+
+
 
     # save plot to file
     pp = PdfPages('figures/' + filename + '_' + ax.get_xlabel() + '_' + select_group +'_combined.pdf')
@@ -335,6 +350,7 @@ def merge_result_sets(rss, unprivileged_group, privileged_group, ft_name):
     return plot_data_df
 
 def boxplot(rss, up, p, name=''):
+    sns.set(font_scale=1.0)
     ft_name = 'credit_h_pr'
     plot_data_df = merge_result_sets(rss, up, p, ft_name)
 

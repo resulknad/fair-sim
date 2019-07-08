@@ -257,12 +257,11 @@ filename = "notions_of_fairness_bf_8"
 rss = load(filename)
 plot.boxplot(rss, unprivileged_group, privileged_group, name=filename)
 
-if False:
-    plot.plot_all_mutable_features_combined(rss, unprivileged_group, privileged_group, dataset, 'purpose', filename=filename, kind='cdf', select_group='1', barplot_delta=True)
-    plot.plot_all_mutable_features_combined(rss, unprivileged_group, privileged_group, dataset, 'purpose', filename=filename, kind='cdf', select_group='0', barplot_delta=True)
+plot.plot_all_mutable_features_combined(rss, unprivileged_group, privileged_group, dataset, 'purpose', filename=filename, kind='cdf', select_group='1', barplot_delta=True)
+plot.plot_all_mutable_features_combined(rss, unprivileged_group, privileged_group, dataset, 'purpose', filename=filename, kind='cdf', select_group='0', barplot_delta=True)
 
-    plot.plot_all_mutable_features_combined(rss, unprivileged_group, privileged_group, dataset, 'savings', filename=filename, kind='cdf', select_group='1')
-    plot.plot_all_mutable_features_combined(rss, unprivileged_group, privileged_group, dataset, 'savings', filename=filename, kind='cdf', select_group='0')
+plot.plot_all_mutable_features_combined(rss, unprivileged_group, privileged_group, dataset, 'savings', filename=filename, kind='cdf', select_group='1')
+plot.plot_all_mutable_features_combined(rss, unprivileged_group, privileged_group, dataset, 'savings', filename=filename, kind='cdf', select_group='0')
 
 #for ft in all_mutable_dedummy:
 #    if ft == 'savings':
@@ -303,12 +302,11 @@ rss[0] = ('no constraint', rss[0][1])
 save(rss, filename)
 
 plot.boxplot(rss, unprivileged_group, privileged_group, name=filename)
-if False:
-    plot.plot_all_mutable_features_combined(rss, unprivileged_group, privileged_group, dataset, 'purpose', filename=filename, kind='cdf', select_group='1', barplot_delta=True)
-    plot.plot_all_mutable_features_combined(rss, unprivileged_group, privileged_group, dataset, 'purpose', filename=filename, kind='cdf', select_group='0', barplot_delta=True)
+plot.plot_all_mutable_features_combined(rss, unprivileged_group, privileged_group, dataset, 'purpose', filename=filename, kind='cdf', select_group='1', barplot_delta=True)
+plot.plot_all_mutable_features_combined(rss, unprivileged_group, privileged_group, dataset, 'purpose', filename=filename, kind='cdf', select_group='0', barplot_delta=True)
 
-    plot.plot_all_mutable_features_combined(rss, unprivileged_group, privileged_group, dataset, 'savings', filename=filename, kind='cdf', select_group='1')
-    plot.plot_all_mutable_features_combined(rss, unprivileged_group, privileged_group, dataset, 'savings', filename=filename, kind='cdf', select_group='0')
+plot.plot_all_mutable_features_combined(rss, unprivileged_group, privileged_group, dataset, 'savings', filename=filename, kind='cdf', select_group='1')
+plot.plot_all_mutable_features_combined(rss, unprivileged_group, privileged_group, dataset, 'savings', filename=filename, kind='cdf', select_group='0')
 
 #plot.plot_all_mutable_features_combined(rss, unprivileged_group, privileged_group, dataset, 'savings', filename=filename, kind='cdf', select_group='0')
 
