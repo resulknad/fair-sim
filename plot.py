@@ -1,6 +1,8 @@
 import matplotlib.pyplot as plt
+from colour import Color
 from IPython.display import display, Markdown, Latex
 
+import itertools
 from itertools import starmap
 import numpy as np
 from functools import reduce
@@ -37,9 +39,12 @@ def merge_all_dfs(result_set):
     df_new = pd.concat(list(map(lambda r: r.df_new, result_set.results)), ignore_index=True)
     return df, df_new
 
-def modify_legend(labels):
+def modify_legend(labels, remove_all_impacted=False):
     search = ['0_0', '0_1', '1_0', '1_1']
-    replace = ['Initial UP', 'Impacted UP', 'Initial P', 'Impacted P']
+    if remove_all_impacted:
+        replace = ['initial', '', 'initial', '']
+    else:
+        replace = ['Initial UP', 'Impacted UP', 'Initial P', 'Impacted P']
     for i in range(len(labels)):
         for k,v in zip(search, replace):
             labels[i] = labels[i].replace(k,v)
@@ -92,13 +97,8 @@ def plot_distribution(dataset, dist_plot_attr):
     display(Markdown("### Distribution of " + dist_plot_attr))
     plt.show()
 
-def plot_all_mutable_features(rs, unprivileged_group, privileged_group, dataset,all_mutable,name='a', kind='pdf'):
-    sns.set_style("whitegrid")
-
+def prepare_df_feature(rs, unprivileged_group, privileged_group, dataset,mutable_attr, kind, barplot_delta=False):
     ft_name = 'credit_h_pr'
-
-
-    all_mutable_dedummy = list(set(map(lambda s: s.split('=')[0], all_mutable)))
 
     df, df_post = merge_all_dfs(rs)
     df = df.replace(dataset().human_readable_labels)
@@ -106,48 +106,180 @@ def plot_all_mutable_features(rs, unprivileged_group, privileged_group, dataset,
 
     N = count_df(df, [unprivileged_group, privileged_group])
 
-    for mutable_attr in all_mutable_dedummy:
-        dfs = []
-        for sc in [unprivileged_group, privileged_group]:
+    dfs = []
+    for sc in [unprivileged_group, privileged_group]:
 
-            df_ = _df_selection(df, sc)
+        df_ = _df_selection(df, sc)
 
-            df_post_ = _df_selection(df_post, sc)
+        df_post_ = _df_selection(df_post, sc)
 
-            grp = str(list(sc.values())[0])
-            dfs.append(merge_dfs('time', grp + '_0' , grp+'_1', df_, df_post_))
-        merged = pd.concat(dfs)
+        grp = str(list(sc.values())[0])
+        dfs.append(merge_dfs('time', grp + '_0' , grp+'_1', df_, df_post_))
+    merged = pd.concat(dfs)
 
-        #merged = merge_dfs('time', 'pre', 'post', df, df_new)
-        merged = merged.reset_index(drop=True).reset_index().groupby([mutable_attr, 'time']).count().reset_index()
+    #merged = merge_dfs('time', 'pre', 'post', df, df_new)
+    merged = merged.reset_index(drop=True).reset_index().groupby([mutable_attr, 'time']).count().reset_index()
+
+    def normalize(row):
+        if row['time'][0] == '0':
+            row['index'] /= N[0]
+        else:
+            row['index'] /= N[1]
+        return row
+
+    merged = merged.apply(normalize, axis=1)
+
+    merged['time'] = merged['time'].astype('category')
+
+    # if datapoint is missing, there's a gap
+    # we don't want that
+    for t in merged[mutable_attr]:
+        for h in list(set(merged['time'])):
+            if (((merged['time'] == h) & (merged[mutable_attr] == t)).sum()) == 0:
+                merged = merged.append({'time': h, mutable_attr: t, 'index': 0.}, ignore_index=True)
+                # datapoint is missing
+                # add one with y=0
+    #print(merged.dtypes)
+    merged = merged.sort_values(mutable_attr)
+
+    if np.issubdtype(merged[mutable_attr], np.number) and kind=='cdf':
+        for time in ['0_0', '0_1', '1_0','1_1']:
+            mask = merged['time'] == time
+            merged.loc[mask,'index'] = merged.loc[mask,'index'].cumsum()
+
+    if barplot_delta:
+        # calculate deltas
+        # group initial and impacted
+        merged = merged.groupby(lambda r: merged.loc[r,mutable_attr] + '_' + merged.loc[r,'time'][0])
+
+        # calculate difference initial and impacted
+        def fn(df):
+            #print(df)
+            df = df.sort_values('time')
+            df['index'].iloc[1] = df['index'].iloc[1] - df['index'].iloc[0]
+            return df.iloc[1]
+        merged = (merged.agg(fn))
+
+    return merged
 
 
+def plot_all_mutable_features_combined(rss, unprivileged_group, privileged_group, dataset,mutable_attr, filename='a', kind='pdf', select_group='0', barplot_delta=False):
+    basecolor = Color('#4286f4' if select_group == '0' else '#f45942')
+
+    sns.set_style("whitegrid")
+
+    dfs = []
+    palette = {'0_0': '#4286f4', '1_0':'#f45942'}
+    linestyles=['-']#,'-']
+    cnt = 0
+    # merge datapoints from all methods in rss
+    for name,rs in rss:
+        print(name)
+        # get cdf for one method
+        merged = prepare_df_feature(rs, unprivileged_group, privileged_group, dataset,mutable_attr, kind, barplot_delta=barplot_delta)
 
 
-        def normalize(row):
-            if row['time'][0] == '0':
-                row['index'] /= N[0]
-            else:
-                row['index'] /= N[1]
+        # add initial distribution only once
+        if cnt > 0 and not barplot_delta:
+            merged = merged[(merged['time'] != '0_0') & (merged['time'] != '1_0')]
+
+        # select some group
+        merged = merged[(merged['time'] == select_group + '_0') | (merged['time'] == select_group + '_1')]
+
+        # prepend method name to 'time'
+        def prepend_time(row):
+            if row['time'][2] != '0' or barplot_delta:
+                row['time'] = name + " " + row['time']
             return row
 
-        merged = merged.apply(normalize, axis=1)
+        merged = merged.apply(prepend_time, axis=1)
+        dfs.append(merged)
 
-        #display(merged)
+        # set color
+        palette[name + ' 0_1'] = '#91bbff'
+        palette[name + ' 1_1'] = '#ff9282'#'#91bbff'
+
+        # set linestyle
+        linestyles.append((1,(4,1)))
+
+        cnt = cnt + 1
+
+    merged = pd.concat(dfs)
+
+    #
+
+    # set y label
+    ylabel = 'probability density'
+    #if kind == 'cdf':
+    #    ylabel = 'cumulative probability'
+
+    plt.figure(figsize=(10,6))
+    if np.issubdtype(merged[mutable_attr], np.number):
+        if kind == 'cdf':
+            ylabel = 'cumulative probability'
+        ax = sns.pointplot(scale=.4,x=mutable_attr, hue="time", y="index",
+                    data=merged,
+                    palette=palette,
+                    linestyles=linestyles,
+                    markers=['o','v','^','<','>'])
+        ax.set_ylabel('')
+    else:
+        if barplot_delta:
+            ylabel += ' difference'
+        ax = sns.barplot(x=mutable_attr, hue="time", y="index",
+                    data=merged,  palette=itertools.cycle([basecolor.hex]))
+        num_locations = len(merged[mutable_attr].unique())
+        hatches = itertools.cycle(['///', '----', '|||', '\\\\\\'])
+        for i, bar in enumerate(ax.patches):
+            if i % num_locations == 0:
+                hatch = next(hatches)
+            bar.set_hatch(hatch)
+        ax.set_ylabel('')
+
+
+    # change marker size, marker edge color
+    edgecolor = 'r' if select_group == '1' else 'b'
+    plt.setp(ax.collections, alpha=0.8, sizes=[30], edgecolors=edgecolor)
+
+    # change line opacity
+    plt.setp(ax.lines, alpha=.6)
+
+    ax.set_ylabel('')
+
+    handles, labels = ax.get_legend_handles_labels()
+    #print(ax.get_xlabel())
+
+    # remove underlines in x axis legend
+    ax.set(ylabel=ylabel, xlabel=ax.get_xlabel().replace('_', ' '))
+
+    # rotate x axis legend
+    ax.set_xticklabels(ax.get_xticklabels(),rotation=90)
+
+    # place legend and change legend text
+    ax.legend(handles=handles[0:], labels=modify_legend(labels[0:], remove_all_impacted=True),bbox_to_anchor=(0., 1.02, 1., .102), loc=3, ncol=2, mode='expand')
+
+    # save plot to file
+    pp = PdfPages('figures/' + filename + '_' + ax.get_xlabel() + '_' + select_group +'_combined.pdf')
+    pp.savefig(bbox_inches="tight")
+    pp.close()
+    plt.show()
+
+def plot_all_mutable_features(rs, unprivileged_group, privileged_group, dataset,all_mutable,name='a', kind='pdf', barplot_delta=True):
+    sns.set_style("whitegrid")
+
+    all_mutable_dedummy = list(set(map(lambda s: s.split('=')[0], all_mutable)))
+
+    for mutable_attr in all_mutable_dedummy:
+
         plt.figure(mutable_attr)
-        merged['time'] = merged['time'].astype('category')
+        merged = prepare_df_feature(rs, unprivileged_group, privileged_group, dataset,mutable_attr, kind, barplot_delta=barplot_delta)
 
-        # if datapoint is missing, there's a gap
-        # we don't want that
-        for t in merged[mutable_attr]:
-            for h in list(set(merged['time'])):
-                if (((merged['time'] == h) & (merged[mutable_attr] == t)).sum()) == 0:
-                    merged = merged.append({'time': h, mutable_attr: t, 'index': 0.}, ignore_index=True)
-                    # datapoint is missing
-                    # add one with y=0
-        #print(merged.dtypes)
-        merged = merged.sort_values(mutable_attr)
 
+
+
+
+            #merged.loc[merged['index'] == 0.0,'index'] = 0.00001
+        #print(merged)
 
         palette = {'0_0': '#4286f4', '0_1':'#91bbff', '1_0':'#f45942', '1_1':'#ff9282'}
         ylabel = 'probability density'
@@ -155,23 +287,34 @@ def plot_all_mutable_features(rs, unprivileged_group, privileged_group, dataset,
         if np.issubdtype(merged[mutable_attr], np.number):
             if kind == 'cdf':
                 ylabel = 'cumulative probability'
-                for time in ['0_0', '0_1', '1_0','1_1']:
-                    mask = merged['time'] == time
-                    merged.loc[mask,'index'] = merged.loc[mask,'index'].cumsum()
             ax = sns.pointplot(scale=0.75,x=mutable_attr, hue="time", y="index",
                         data=merged, palette=palette, linestyles=['-','--','-','--'])
+            ax.set_ylabel('')
         else:
             ax = sns.barplot(x=mutable_attr, hue="time", y="index",
                         data=merged,  palette=palette)
+            ax.set_ylabel('')
+
+            # remove y axis line at 0 (confusing if many bars = 0)
+
+
+            #y_ticks =
+            #ax.set_yticks(y_ticks[y_ticks != 0])
+
         handles, labels = ax.get_legend_handles_labels()
         #print(ax.get_xlabel())
 
         ax.set(ylabel=ylabel, xlabel=ax.get_xlabel().replace('_', ' '))
         ax.set_xticklabels(ax.get_xticklabels(),rotation=90)
-        ax.legend(handles=handles[0:], labels=modify_legend(labels[0:]))
+        ax.legend(handles=handles[0:], labels=modify_legend(labels[0:]),bbox_to_anchor=(0., 1.02, 1., .102), loc=3, ncol=2, mode='expand')
         pp = PdfPages('figures/' + name + '_' + ax.get_xlabel() +'.pdf')
         pp.savefig(bbox_inches="tight")
         pp.close()
+
+        yticks = ax.yaxis.get_major_ticks()
+        plt.setp(yticks[np.where(ax.get_yticks() == 0)[0][0]].gridline, visible=False)
+        #yticks[1].gridline.linewidth = 1000
+
         plt.show()
 
 def merge_result_sets(rss, unprivileged_group, privileged_group, ft_name):
@@ -194,14 +337,32 @@ def merge_result_sets(rss, unprivileged_group, privileged_group, ft_name):
 def boxplot(rss, up, p, name=''):
     ft_name = 'credit_h_pr'
     plot_data_df = merge_result_sets(rss, up, p, ft_name)
+
+    table_df = plot_data_df.groupby(['name', 'time']).median().reset_index()
+
+    # calculate deltas
+    # group initial and impacted
+    merged = table_df.groupby(lambda r: table_df.loc[r,'name'] + '_' + table_df.loc[r,'time'][0])
+
+    # calculate difference initial and impacted
+    def fn(df):
+        print(len(df), df)
+        df = df.sort_values('time')
+        df['credit_h_pr'].iloc[1] = df['credit_h_pr'].iloc[1] - df['credit_h_pr'].iloc[0]
+        return df.iloc[1]
+
+    merged = (merged.apply(fn).pivot(index='time', columns='name', values='credit_h_pr'))
+
+    #merged['time'] = modify_legend(merged['time'])
+
+    print(merged.round(3).to_latex())
     sns.set_style("whitegrid")
     palette = {'0_0': '#4286f4', '0_1':'#91bbff', '1_0':'#f45942', '1_1':'#ff9282'}
 
     ax = sns.boxplot(x="name", y=ft_name, hue="time",
                 data=plot_data_df, palette=palette)
 
-
-
+    ax.set_xlabel('')
 
     pp = PdfPages('figures/' + name + '.pdf')
     handles, labels = ax.get_legend_handles_labels()

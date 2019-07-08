@@ -1,0 +1,319 @@
+
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta charset="utf-8" />
+    <title>simulation &#8212; fair-sim  documentation</title>
+    <link rel="stylesheet" href="../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+    <script type="text/javascript" src="../_static/jquery.js"></script>
+    <script type="text/javascript" src="../_static/underscore.js"></script>
+    <script type="text/javascript" src="../_static/doctools.js"></script>
+    <script type="text/javascript" src="../_static/language_data.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="mutabledataset" href="mutabledataset.html" />
+    <link rel="prev" title="transformer" href="transformation.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <div class="section" id="simulation">
+<h1><code class="xref py py-mod docutils literal notranslate"><span class="pre">simulation</span></code><a class="headerlink" href="#simulation" title="Permalink to this headline">¶</a></h1>
+<dl class="class">
+<dt id="simulation.Simulation">
+<em class="property">class </em><code class="sig-prename descclassname">simulation.</code><code class="sig-name descname">Simulation</code><span class="sig-paren">(</span><em class="sig-param">dataset, AgentCl, learner, cost_distribution, split=[0.5], collect_incentive_data=False, no_neighbors=60, cost_distribution_dep=None, max_it=130</em><span class="sig-paren">)</span><a class="headerlink" href="#simulation.Simulation" title="Permalink to this definition">¶</a></dt>
+<dd><p>Class glueing all the pieces together. Performs whole simulation.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>dataset</strong> – Dataset which extends <code class="xref py py-obj docutils literal notranslate"><span class="pre">mutabledataset.SimMixin</span></code></p></li>
+<li><p><strong>AgentCl</strong> – Class defining agent behavior, namely <cite>benefit</cite> and <cite>cost</cite>.</p></li>
+<li><p><strong>learner</strong> – Class defining learner behavior, namely <cite>fit</cite> and <cite>predict</cite>.</p></li>
+<li><p><strong>split</strong> – Defines portion used for fitting the learner. Rest is used for determining <cite>eps</cite> value, regarding the epsilon equilibrium. Simulation is done on the whole dataset.</p></li>
+<li><p><strong>cost_distribution</strong> – Passed on to AgentTransformer.</p></li>
+<li><p><strong>cost_distribution_dep</strong> – Passed on to AgentTransformer.</p></li>
+<li><p><strong>no_neighbors</strong> – Passed on to AgentTransformer.</p></li>
+<li><p><strong>max_it</strong> – Passed on to AgentTransformer.</p></li>
+<li><p><strong>collect_incentive_data</strong> – Passed on to AgentTransformer.</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="method">
+<dt id="simulation.Simulation._simulate">
+<code class="sig-name descname">_simulate</code><span class="sig-paren">(</span><em class="sig-param">scale</em><span class="sig-paren">)</span><a class="headerlink" href="#simulation.Simulation._simulate" title="Permalink to this definition">¶</a></dt>
+<dd><p>Private entrypoint to perform a single simulation</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>scale</strong> – Perform scaling on dataset features</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>Modified dataset including new ground truth labels</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="#simulation.SimulationResult" title="simulation.SimulationResult"><code class="xref py py-obj docutils literal notranslate"><span class="pre">simulation.SimulationResult</span></code></a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="simulation.Simulation.no_classes">
+<code class="sig-name descname">no_classes</code><span class="sig-paren">(</span><em class="sig-param">dataset</em><span class="sig-paren">)</span><a class="headerlink" href="#simulation.Simulation.no_classes" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>dataset</strong> – Some AIF360 dataset</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>Number of distinct labels (classes)</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="simulation.Simulation.start_simulation">
+<code class="sig-name descname">start_simulation</code><span class="sig-paren">(</span><em class="sig-param">runs=1</em>, <em class="sig-param">scale=True</em><span class="sig-paren">)</span><a class="headerlink" href="#simulation.Simulation.start_simulation" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>runs</strong> – Run simulation multiple times with the same parameters</p></li>
+<li><p><strong>scale</strong> – Perform scaling on dataset features.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>Modified dataset including new ground truth labels</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="#simulation.SimulationResultSet" title="simulation.SimulationResultSet"><code class="xref py py-obj docutils literal notranslate"><span class="pre">simulation.SimulationResultSet</span></code></a></p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="simulation.SimulationResult">
+<em class="property">class </em><code class="sig-prename descclassname">simulation.</code><code class="sig-name descname">SimulationResult</code><a class="headerlink" href="#simulation.SimulationResult" title="Permalink to this definition">¶</a></dt>
+<dd><p>Collection of <a class="reference internal" href="#simulation.SimulationResult" title="simulation.SimulationResult"><code class="xref py py-obj docutils literal notranslate"><span class="pre">simulation.SimulationResult</span></code></a></p>
+<dl class="field-list simple">
+<dt class="field-odd">Attr df</dt>
+<dd class="field-odd"><p>Dataframe with features pre-simulation</p>
+</dd>
+<dt class="field-even">Attr df_new</dt>
+<dd class="field-even"><p>Dataframe with features post-simulation</p>
+</dd>
+<dt class="field-odd">Attr incentives</dt>
+<dd class="field-odd"><p>List with gradient ascend debugging information.</p>
+</dd>
+<dt class="field-even">Attr eps</dt>
+<dd class="field-even"><p>Eps value regarding the epsilon-approximate-equilibrium.</p>
+</dd>
+<dt class="field-odd">Attr acc_h</dt>
+<dd class="field-odd"><p>Accuracy of learners initial h</p>
+</dd>
+<dt class="field-even">Attr acc_h_post</dt>
+<dd class="field-even"><p>Accuracy of learners initial h, calculated on post-simulation dataset</p>
+</dd>
+<dt class="field-odd">Attr acc_h_star_post</dt>
+<dd class="field-odd"><p>Accuracy of h_star, meaning classifier fitted on modified dataset</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="class">
+<dt id="simulation.SimulationResultSet">
+<em class="property">class </em><code class="sig-prename descclassname">simulation.</code><code class="sig-name descname">SimulationResultSet</code><span class="sig-paren">(</span><em class="sig-param">results</em>, <em class="sig-param">runs=0</em><span class="sig-paren">)</span><a class="headerlink" href="#simulation.SimulationResultSet" title="Permalink to this definition">¶</a></dt>
+<dd><p>Collection of <a class="reference internal" href="#simulation.SimulationResult" title="simulation.SimulationResult"><code class="xref py py-obj docutils literal notranslate"><span class="pre">simulation.SimulationResult</span></code></a></p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>results</strong> – List of <a class="reference internal" href="#simulation.SimulationResult" title="simulation.SimulationResult"><code class="xref py py-obj docutils literal notranslate"><span class="pre">simulation.SimulationResult</span></code></a></p></li>
+<li><p><strong>runs</strong> – Number of runs. Should equal length of <cite>results</cite>.</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="method">
+<dt id="simulation.SimulationResultSet._average_vals">
+<code class="sig-name descname">_average_vals</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#simulation.SimulationResultSet._average_vals" title="Permalink to this definition">¶</a></dt>
+<dd><p>Calculates mean and std of some <a class="reference internal" href="#simulation.SimulationResult" title="simulation.SimulationResult"><code class="xref py py-obj docutils literal notranslate"><span class="pre">simulation.SimulationResult</span></code></a> attributes. Is called in constructor.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="simulation.SimulationResultSet._pr">
+<code class="sig-name descname">_pr</code><span class="sig-paren">(</span><em class="sig-param">group</em>, <em class="sig-param">time='post'</em>, <em class="sig-param">ft_name='credit_h'</em><span class="sig-paren">)</span><a class="headerlink" href="#simulation.SimulationResultSet._pr" title="Permalink to this definition">¶</a></dt>
+<dd><p>Calculates selection rate for one group.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>group</strong> – Dictionary containing selection criterias for group.</p></li>
+<li><p><strong>time</strong> – Either post(-simulation) or pre(-simulation).</p></li>
+<li><p><strong>ft_name</strong> – One of <cite>credit_h</cite> (predicted label), <cite>credit_h_pr</cite> (score) or <cite>credit</cite> (true label)</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>List containing selection rates.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="simulation.SimulationResultSet.feature_average">
+<code class="sig-name descname">feature_average</code><span class="sig-paren">(</span><em class="sig-param">feature</em>, <em class="sig-param">selection_criteria={}</em><span class="sig-paren">)</span><a class="headerlink" href="#simulation.SimulationResultSet.feature_average" title="Permalink to this definition">¶</a></dt>
+<dd><p>Calculates feature average over multiple runs for pre- and post-simulation.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>selection_criteria</strong> – Dict to select instances. Empty selects all.</p></li>
+<li><p><strong>feature</strong> – Feature of interest.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>pre_mean, pre_std, post_mean, post_std</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="simulation.SimulationResultSet.feature_table">
+<code class="sig-name descname">feature_table</code><span class="sig-paren">(</span><em class="sig-param">selection_criteria=[]</em><span class="sig-paren">)</span><a class="headerlink" href="#simulation.SimulationResultSet.feature_table" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns dataframe showing how the simulation changed the feature average</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>selection_criteria</strong> – List of dictionaries with selection criterias. Useful for comparison between groups.</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>Feature table</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">pd.DataFrame</span></code></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="simulation.SimulationResultSet.stat_parity_diff">
+<code class="sig-name descname">stat_parity_diff</code><span class="sig-paren">(</span><em class="sig-param">unpriv</em>, <em class="sig-param">priv</em>, <em class="sig-param">time='post'</em><span class="sig-paren">)</span><a class="headerlink" href="#simulation.SimulationResultSet.stat_parity_diff" title="Permalink to this definition">¶</a></dt>
+<dd><p>Calculates statistical parity difference.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>unpriv</strong> – Dict to select unprivileged instances.</p></li>
+<li><p><strong>priv</strong> – Dict to select privileged instances.</p></li>
+<li><p><strong>time</strong> – Either post(-simulation) or pre(-simulation).</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>Statistical parity difference.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="simulation.SimulationResultSet.tpr">
+<code class="sig-name descname">tpr</code><span class="sig-paren">(</span><em class="sig-param">selection_criteria={}</em>, <em class="sig-param">truth_ft='y'</em>, <em class="sig-param">pred_ft='credit_h'</em>, <em class="sig-param">time='post'</em><span class="sig-paren">)</span><a class="headerlink" href="#simulation.SimulationResultSet.tpr" title="Permalink to this definition">¶</a></dt>
+<dd><p>Calculates TPR.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>selection_criteria</strong> – Dict to select instances. Empty selects all.</p></li>
+<li><p><strong>truth_ft</strong> – Feature containing true labels.</p></li>
+<li><p><strong>pred_ft</strong> – Feature containing predicted labels.</p></li>
+<li><p><strong>time</strong> – Either post(-simulation) or pre(-simulation).</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>TPR</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../index.html">fair-sim</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<p class="caption"><span class="caption-text">Modules</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="transformation.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">transformer</span></code></a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#"><code class="xref py py-mod docutils literal notranslate"><span class="pre">simulation</span></code></a></li>
+<li class="toctree-l1"><a class="reference internal" href="mutabledataset.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">mutabledataset</span></code></a></li>
+<li class="toctree-l1"><a class="reference internal" href="learner.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">learner</span></code></a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+      <li>Previous: <a href="transformation.html" title="previous chapter"><code class="xref py py-mod docutils literal notranslate"><span class="pre">transformer</span></code></a></li>
+      <li>Next: <a href="mutabledataset.html" title="next chapter"><code class="xref py py-mod docutils literal notranslate"><span class="pre">mutabledataset</span></code></a></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2019, Dan Kluser.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 2.1.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/modules/simulation.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

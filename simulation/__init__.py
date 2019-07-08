@@ -13,5 +13,5 @@ import re
 from transformer import AgentTransformer
 
 
-from .simulationresult import SimulationResultSet
+from .simulationresult import SimulationResultSet, SimulationResult
 from .simulation import Simulation

@@ -11,6 +11,10 @@ Welcome to fair-sim's documentation!
    :caption: Modules
 
    modules/transformation
+   modules/simulation
+   modules/mutabledataset
+   modules/learner
+   modules/agent
 
 
 Indices and tables

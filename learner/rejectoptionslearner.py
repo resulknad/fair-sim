@@ -1,12 +1,16 @@
 import numpy as np
 from utils import dataset_from_matrix
-from .utils import _accuracy
+from .utils import _accuracy, _drop_protected
 from sklearn.linear_model import LogisticRegression
 from scipy.special import expit
 from aif360.algorithms.postprocessing.reject_option_classification import RejectOptionClassification
 
-class RejectOptionsLogisticLearner(object):
-    def __init__(self, privileged_groups, unprivileged_groups, metric_name="Statistical parity difference", abs_bound=0.05):
+from .generallearner import GeneralLearner
+
+class RejectOptionsLogisticLearner(GeneralLearner):
+    """Reject Options post-processing technique is applied on a logistic regression model."""
+    def __init__(self, privileged_groups, unprivileged_groups, metric_name="Statistical parity difference", abs_bound=0.05, exclude_protected=False):
+        self.exclude_protected = exclude_protected
         self.privileged_group = privileged_groups
         self.unprivileged_group = unprivileged_groups
         self.metric_name = metric_name
@@ -16,17 +20,21 @@ class RejectOptionsLogisticLearner(object):
         self.max_decrease = 0.
         self.no_increased = 0
 
+
+    def drop_prot(self, dataset, x):
+        return _drop_protected(dataset, np.array(x)) if self.exclude_protected else x
+
     def debug_info(self):
         return str(self.threshold) + "\t" + str(self.max_increase) + "\t" + str(self.max_decrease) + "\t" + str(self.no_increased)
 
     def fit(self, dataset):
-        reg = LogisticRegression(solver='liblinear',max_iter=1000000000).fit(dataset.features, dataset.labels.ravel())
+        reg = LogisticRegression(solver='liblinear',max_iter=1000000000).fit(self.drop_prot(dataset, dataset.features), dataset.labels.ravel())
 
         dataset_p = dataset.copy(deepcopy=True)
-        dataset_p.scores = np.array(list(map(lambda x: [x[1]],reg.predict_proba(dataset.features))))
+        dataset_p.scores = np.array(list(map(lambda x: [x[1]],reg.predict_proba(self.drop_prot(dataset, dataset.features)))))
         #print(reg.predict_proba(dataset.features))
         #print(dataset_p.scores)
-        dataset_p.labels = np.array(list(map(lambda x: [x], reg.predict(dataset.features))))
+        dataset_p.labels = np.array(list(map(lambda x: [x], reg.predict(self.drop_prot(dataset, dataset.features)))))
 
         ro = RejectOptionClassification(unprivileged_groups=self.unprivileged_group,
                 privileged_groups=self.privileged_group,
@@ -39,8 +47,8 @@ class RejectOptionsLogisticLearner(object):
 
         def h(x):
             # add dummy labels as we're going to predict them anyway...
-            x_with_labels = np.hstack((x, list(map(lambda x: [x], reg.predict(x)))))
-            scores = list(map(lambda x:[x[1]],reg.predict_proba(x)))
+            x_with_labels = np.hstack((x, list(map(lambda x: [x], reg.predict(self.drop_prot(dataset, x))))))
+            scores = list(map(lambda x:[x[1]],reg.predict_proba(self.drop_prot(dataset, x))))
             dataset_ = dataset_from_matrix(x_with_labels, dataset)
             dataset_.scores = np.array(scores)
             labels_pre = dataset_.labels
@@ -50,9 +58,9 @@ class RejectOptionsLogisticLearner(object):
 
         def h_pr(x,boost=True):
             thresh = ro.classification_threshold
-            scores = np.array(list(map(lambda x:x[1], reg.predict_proba(x))))
-            scores_ = np.array(list(map(lambda x:x[1], reg.predict_proba(x))))
-            orig_pred = list(map(lambda x: x[1] > thresh, reg.predict_proba(x)))
+            scores = np.array(list(map(lambda x:x[1], reg.predict_proba(self.drop_prot(dataset, x)))))
+            scores_ = np.array(list(map(lambda x:x[1], reg.predict_proba(self.drop_prot(dataset, x)))))
+            orig_pred = list(map(lambda x: x[1] > thresh, reg.predict_proba(self.drop_prot(dataset, x))))
             boosted_pred = h(x)
 
             changed = (boosted_pred - orig_pred)
@@ -66,14 +74,16 @@ class RejectOptionsLogisticLearner(object):
 
             lower_bound = ro.classification_threshold - ro.ROC_margin -0.1
             upper_bound = ro.classification_threshold + ro.ROC_margin + 0.1
-            #print(upper_bound)
+            #print(self.metric_name, lower_bound, upper_bound)
 
             def booster_fn(scores):
-                return (expit(100*(scores - lower_bound)) - expit(100*(scores - upper_bound))) * ro.ROC_margin
+                return (expit(75*(scores - lower_bound)) - expit(75*(scores - upper_bound))) * ro.ROC_margin
 
             scores[priv_ind] -= booster_fn(scores[priv_ind])
+
             scores[unpriv_ind] += booster_fn(scores[unpriv_ind])
 
+            assert((np.clip(scores, None, 1.)[priv_ind] <= scores_[priv_ind]).all())
             assert((scores != scores_).any())
 
 
@@ -84,6 +94,7 @@ class RejectOptionsLogisticLearner(object):
             #print(ro.classification_threshold, ro.ROC_margin)
             #print(diff, scores[diff], scores_[diff])
             #print(booster_fn(scores_[diff]))
+            #print(list(map(lambda x: x-thresh, scores[diff])))
             #assert(len(diff)==0)
 
 

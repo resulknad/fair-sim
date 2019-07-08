@@ -4,32 +4,22 @@ from functools import reduce
 import pandas as pd
 
 class SimulationResultSet:
+    """Collection of :py:obj:`simulation.SimulationResult`
+
+    :param results: List of :py:obj:`simulation.SimulationResult`
+    :param runs: Number of runs. Should equal length of `results`.
+    """
     results = []
-
-    def save(self, filename):
-        dumpfile = open(filename, 'ab')
-        pickle.dump(self, dumpfile)
-        dumpfile.close()
-
-    def load(filename):
-        rs = {}
-        dumpfile = open(filename, 'ab')
-        pickle.dump(rs, dumpfile)
-        dumpfile.close()
-        return rs
 
     def __init__(self, results, runs=0):
         self.results = results
         self.runs = runs
         self._average_vals()
 
-    def _avg_incentive(self, feature, group):
-        #print(group)
-        combined = pd.concat(list(map(lambda x: x.incentives[[group, feature, 'incentive']], self.results)))
-        return combined.groupby([group, feature]).mean()
-
-
     def _average_vals(self):
+        """
+        Calculates mean and std of some :py:obj:`simulation.SimulationResult` attributes. Is called in constructor.
+        """
         self.eps = np.average(list(map(lambda x: x.eps, self.results)))
         #print(list(map(lambda x: x.eps, self.results)))
         self.eps_std = np.std(list(map(lambda x: x.eps, self.results)))
@@ -41,6 +31,15 @@ class SimulationResultSet:
         #self.incentives = at.incentive_df
 
     def _pr(self, group, time='post', ft_name='credit_h'):
+        """
+        Calculates selection rate for one group.
+
+        :param group: Dictionary containing selection criterias for group.
+        :param time: Either post(-simulation) or pre(-simulation).
+        :param ft_name: One of `credit_h` (predicted label), `credit_h_pr` (score) or `credit` (true label)
+
+        :returns: List containing selection rates.
+        """
         pr_list = []
 
         for res in self.results:
@@ -52,8 +51,16 @@ class SimulationResultSet:
             pr_list.append(pr)
         return np.mean(pr_list)
 
-    # returns average of stat parity diff post sim
     def stat_parity_diff(self, unpriv, priv, time='post'):
+        """
+        Calculates statistical parity difference.
+
+        :param unpriv: Dict to select unprivileged instances.
+        :param priv: Dict to select privileged instances.
+        :param time: Either post(-simulation) or pre(-simulation).
+
+        :returns: Statistical parity difference.
+        """
         up_pr = self._pr(unpriv, time=time)
         p_pr = self._pr(priv, time=time)
 
@@ -61,6 +68,16 @@ class SimulationResultSet:
 
 
     def tpr(self, selection_criteria={}, truth_ft='y', pred_ft='credit_h', time='post'):
+        """
+        Calculates TPR.
+
+        :param selection_criteria: Dict to select instances. Empty selects all.
+        :param truth_ft: Feature containing true labels.
+        :param pred_ft: Feature containing predicted labels.
+        :param time: Either post(-simulation) or pre(-simulation).
+
+        :returns: TPR
+        """
         dfs = list(map(lambda r: r.df_new if time == 'post' else r.df, self.results))
 
         crit_true = {**selection_criteria, truth_ft: 1}
@@ -74,6 +91,15 @@ class SimulationResultSet:
 
 
     def feature_average(self, feature, selection_criteria={}):
+        """
+        Calculates feature average over multiple runs for pre- and post-simulation.
+
+        :param selection_criteria: Dict to select instances. Empty selects all.
+        :param feature: Feature of interest.
+
+
+        :returns: pre_mean, pre_std, post_mean, post_std
+        """
         ft_values = np.array(list(reduce(lambda x,y: np.hstack((x,y)), map(lambda x: list(_df_selection(x.df, selection_criteria)[feature]), self.results))))
         if ft_values.dtype == np.float64:
             ft_means = list(map(lambda x: np.mean(list(_df_selection(x.df, selection_criteria)[feature])), self.results))
@@ -88,6 +114,14 @@ class SimulationResultSet:
         #df_new = _df_selection(self.df_new, selection_criteria)
 
     def feature_table(self, selection_criteria=[]):
+        """
+        Returns dataframe showing how the simulation changed the feature average
+
+        :param selection_criteria: List of dictionaries with selection criterias. Useful for comparison between groups.
+
+        :returns: Feature table
+        :rtype: :py:obj:`pd.DataFrame`
+        """
         data = []
         data.append(count_df(self.results[0].df_new, selection_criteria))
         for ft in list(self.results[0].df_new):
@@ -108,6 +142,17 @@ class SimulationResultSet:
 
 
 class SimulationResult:
+    """Collection of :py:obj:`simulation.SimulationResult`
+
+    :attr df: Dataframe with features pre-simulation
+    :attr df_new: Dataframe with features post-simulation
+    :attr incentives: List with gradient ascend debugging information.
+    :attr eps: Eps value regarding the epsilon-approximate-equilibrium.
+    :attr acc_h: Accuracy of learners initial h
+    :attr acc_h_post: Accuracy of learners initial h, calculated on post-simulation dataset
+    :attr acc_h_star_post: Accuracy of h_star, meaning classifier fitted on modified dataset
+    """
+
     df = {}
     df_new = {}
     incentives = {}

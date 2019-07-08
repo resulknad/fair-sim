@@ -3,7 +3,10 @@ from aif360.metrics import BinaryLabelDatasetMetric
 from aif360.algorithms.preprocessing import Reweighing
 from sklearn.linear_model import LogisticRegression
 
-class ReweighingLogisticLearner(object):
+from .generallearner import GeneralLearner
+
+class ReweighingLogisticLearner(GeneralLearner):
+    """Instances are weighted s.t. statistical parity difference on training set is 0. Afterwards a logistic regression model is fitted on the weighted dataset."""
     threshold = 0.5
     def __init__(self, privileged_group, unprivileged_group):
         self.privileged_group = privileged_group

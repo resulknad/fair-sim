@@ -13,8 +13,16 @@ import pandas as pd
 import uuid
 
 # copied from SCIKIT OPTIMIZE and modified:
-# approximates the gradient of a multivariate function using central differences
+
 def approx_fprime(xk, f, epsilon, args=(), f0=None, immutable=[]):
+    """Based on `approx_fprime` from `scikit.optimize`. Approximates the gradient of a multivariate function using finite central difference approximation at a certain point `xk`.
+
+        :param xk: Points of evaluation. Matrix with dimension `n_instances x n_features`.
+        :param f: Function whose gradient we want to approximate.
+        :param epsilon: Step size (`h`) for approximation
+        :param immutable: Feature index where gradient approximation is not performed.
+        :returns: Post-simulation dataset with updated feature vectors and updated ground truth.
+    """
     if f0 is None:
         f0 = f(*((xk,) + args))
     n_instances, n_features = xk.shape
@@ -60,7 +68,14 @@ class AgentTransformer(Transformer):
             cost_distribution=cost_distribution)
 
     def _optimal_x_gd(self, dataset, cost):
-        # approximates best-response for agent using gradient ascend
+        """Performs gradient ascend on the incentive function specified in :py:attr:`agent_class`
+
+        :param dataset: Some dataset, which extends `SimMixin`.
+        :param cost: Cost vector for fixed cost. Dimension should match dataset `n_instances x 1`.
+
+        :return: Tuple consisting of manipulated features and the incentive value corresponding to the manipulations
+        """
+
         X = dataset.features
         y = dataset.labels
 
@@ -73,15 +88,9 @@ class AgentTransformer(Transformer):
 
         eps = 0.05
         gradient,incentive = approx_fprime(X, a.incentive, eps, immutable=immutable)
-        #print(gradient.shape)
 
-        #print(gradient)
-        #print("incentive", a.incentive(x))
-
-        #print(dataset.domains)
         # calculates bounds for clipping
         # if immutable, then lower bound = upper bound = present value
-
         min_domain = np.array(list(starmap(
                 lambda i,ft: np.repeat(min(dataset.domains[ft]),len(X)) if ft in dataset.domains
                 else X[:,i],
@@ -97,20 +106,11 @@ class AgentTransformer(Transformer):
 
         def collect_incentive_data(X):
             if self.collect_incentive_data:
-                mask = X[:,6] == 0
-                #gradient_benefit, _ = approx_fprime(X, a.benefit, eps, immutable=immutable)
-                #def bf(x):
-                #    return a.benefit(x, boost=False)
-                #gradient_benefit_wob, _ = approx_fprime(X, bf, eps, immutable=immutable)
-                grp = 1
                 self.incentives.append({'features': X,
                     'benefit': a.benefit(X),
                     'cost': a.cost(X),
                     'boost': 0.,
-                    'names': dataset.feature_names})#self.h.max_increase})
-
-                #    'benefit_grad': gradient_benefit[np.where(X[:,6] == 0)],
-                #    'benefit_grad_wob': gradient_benefit_wob[np.where(X[:,6] == 0)]})
+                    'names': dataset.feature_names})
 
         collect_incentive_data(X)
 
@@ -118,62 +118,24 @@ class AgentTransformer(Transformer):
         incentive_last = 0
         MAXIT = self.max_it
         for i in range(MAXIT):
-            #print(i,"\t",self.h.debug_info())
-
-            #print(X)
             incentive_last = incentive
-            #print("Iteration ",i)
-            X = np.add(X,0.1* gradient)#((100-i)/100)*gradient)
-            X = dataset.scale_dummy_coded(X)
 
+            X = np.add(X,0.1* gradient)
+            X = dataset.scale_dummy_coded(X)
             X = np.clip(X, min_domain, max_domain)
 
-            #gr = lambda gr: gr[147][3]
-            #print("inc",a.benefit(X)[4])
-
             gradient, incentive = approx_fprime(X, a.incentive, eps, immutable=immutable)
-            #gradient_benefit, _ = approx_fprime(X, a.benefit, eps, immutable=immutable)
-            #print("A40: ", np.mean(gradient_benefit[:,dataset.feature_names.index('purpose=A40')]),"A41: ", np.mean(gradient_benefit[:,dataset.feature_names.index('purpose=A41')]))
-
-            #rel_x = list(X[147])
-
-            #sample = np.linspace(-1,2,100)
-            #data_arr = list(map(lambda b: a.benefit([rel_x[0:3] + [b] + rel_x[4:]]), sample))
-            #data_arr = np.array([(sample), data_arr]).transpose()
-            #df = pd.DataFrame(data=data_arr, columns=['x', 'y'])
-            #ax = sns.lineplot(x='x', y="y",data=df)
-
-            #plt.show()
-
-            #def gr(X):
-            #    return X[5,1]
-
-
-            #print("grad",gr(gradient_benefit),"wob",gr(gradient_benefit_wob))
-
             collect_incentive_data(X)
 
-            #gradient_cost, _ = approx_fprime(X, a.cost, eps, immutable=immutable)
-            #gradient_benefit, _ = approx_fprime(X, a.benefit, eps, immutable=immutable)
-
-            #print("Month value:",gr(X), "Overall gradient:", gr(gradient), "Cost gradient:", gr(gradient_cost), "Benefit gradient:",gr(gradient_benefit))
-
-            #print(approx_fprime(np.array([X[147,:]]), a.benefit, eps, immutable=immutable)[0][0][3])
-
-            #print(np.mean(dict(zip(dataset.feature_names, gradient.transpose()))['credit_history=A34']))
-            #print(np.mean(dict(zip(dataset.feature_names, X.transpose()))['credit_history=A34']))
-            #print(np.mean(dict(zip(dataset.feature_names, min_domain))['investment_as_income_percentage']))
-            #print(max(incentive - incentive_last))
-
-            #print(max(abs(incentive - incentive_last)))
             if (abs(incentive - incentive_last) < 0.001).all() and i>20:
                 break
 
 
         print("Gradient ascend stopped after ",i+1,"iterations (max i", MAXIT,", min 20)")
 
-        #print(np.mean(dict(zip(dataset.feature_names, X.transpose()))['credit_history=A34']))
         X = dataset.enforce_dummy_coded(X)
+
+        # finds closest neighbor for discrete features
         X_ = []
         for x, ft in zip(X.transpose(), dataset.feature_names):
             if ft in dataset.domains:
@@ -194,16 +156,16 @@ class AgentTransformer(Transformer):
         X_ = np.array(X_)
         X_ = X_.transpose()
         collect_incentive_data(X_)
-        #if self.collect_incentive_data:
-            #self.incentives.append([X_[np.where(X_[:,6] == 0)],a.benefit(X_)[np.where(X_[:,6] == 0)], a.cost(X_)[np.where(X_[:,6] == 0)]])
-
-
-
 
         return a.incentive(X_), X_
 
 
-    def _do_simulation(self, dataset, gradient_descent=True):
+    def _do_simulation(self, dataset):
+        """Performs simulation on dataset. Calls `_optimal_x_gd` to approximate best-response feature vectors of the agents. Performs KNN for ground truth update.
+
+            :param dataset: Dataset to perform simulation on. Must extend `SimMixin`.
+            :returns: Post-simulation dataset with updated feature vectors and updated ground truth.
+        """
         # setup incentive data collection
         if self.collect_incentive_data:
             self.incentives = []
@@ -225,12 +187,11 @@ class AgentTransformer(Transformer):
         grp1 = []
 
         incentives, X = self._optimal_x_gd(dataset, cost)
-        print("incentive > 0:", (incentives > 0).sum())
+        print("incentive > 0 :", (incentives > 0).sum())
+        print("incentive <=0 :", np.mean(incentives[incentives <= 0]))
 
+        # only update feature vector for agents with incentive >0
         for x_vec,x,y,c,incentive in zip(X,dataset.features, dataset.labels, cost, incentives):
-
-            #print(incentive,x_vec)
-
             if incentive > 0 and not (x_vec == x).all():
                 features_.append(np.array(x_vec))
                 changed_indices.append(i)
@@ -238,11 +199,8 @@ class AgentTransformer(Transformer):
                 features_.append(np.array(x))
             labels_.append(y)
             i+=1
-            #print(features_)
         dataset_.features = features_
 
-        #print("grp0: avg opt x",np.average(np.array(grp0)))
-        #print("grp1: avg opt x",np.average(np.array(grp1)))
         X = np.array(features_)
         Y = np.array(labels_)
 
@@ -263,6 +221,8 @@ class AgentTransformer(Transformer):
         assert(len(X_changed)==len(changed_indices))
         assert(len(X_unchanged)==len(X)-len(changed_indices))
 
+
+        # KNN
         assert(len(dataset.protected_attribute_names)==1)
         group_attr = dataset.protected_attribute_names[0]
         group_ind = dataset.feature_names.index(group_attr)
@@ -274,11 +234,6 @@ class AgentTransformer(Transformer):
             cost = dataset.dynamic_cost(dataset.features, np.repeat([x],len(dataset.features), axis=0))
             cost[cost==0] = 0.00000000000000000000001
             dists = np.float_power(cost, -1)
-            #print("Weights:", dists)
-            #for k,d in zip(range(len(dists)), dists):
-            #    if not (X[k,group_ind] == X_changed[i,group_ind]):
-            #        assert(np.isclose(d,0.0))
-            #print(self.no_neighbors)
             indices = np.argpartition(dists, len(dists)-self.no_neighbors)[-self.no_neighbors:]
 
             #print("indices:", indices)
@@ -303,8 +258,5 @@ class AgentTransformer(Transformer):
 
     def transform(self, dataset):
         dataset_ = self._do_simulation(dataset)
-
-        # create df for incentives
-        ft_names_orig = list(map(lambda x: x+"_orig", dataset.feature_names))
 
         return dataset_

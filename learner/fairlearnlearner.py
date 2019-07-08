@@ -4,8 +4,10 @@ from fairlearn.moments import DP
 from .utils import _accuracy
 import pandas as pd
 import numpy as np
+from .generallearner import GeneralLearner
 
-class FairLearnLearner(object):
+class FairLearnLearner(GeneralLearner):
+    """FairLearn is an in-processing technique which jointly optimizes accuracy and fairness."""
     threshold = 0.5
     def __init__(self, privileged_group, unprivileged_group):
         self.privileged_group = privileged_group

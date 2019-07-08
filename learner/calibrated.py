@@ -6,9 +6,15 @@ from sklearn.model_selection import train_test_split
 from sklearn.calibration import CalibratedClassifierCV
 from scipy.special import expit
 
+from .generallearner import GeneralLearner
+
 from sklearn.model_selection import KFold
 
-class CalibratedLogisticLearner(object):
+
+
+class CalibratedLogisticLearner(GeneralLearner):
+    """
+    Fits a logistic regression and then calibrates for each of the two groups individually using platts scaling"""
     threshold = 0.5
     def __init__(self, privileged_groups, unprivileged_groups):
         self.privileged_group = privileged_groups
@@ -57,12 +63,10 @@ class CalibratedLogisticLearner(object):
             cal_p = CalibratedClassifierCV(reg, cv='prefit')
             cal_p.fit(_drop_protected(self.dataset, X_p_test), y_p_test)
             classifiers_p.append(cal_p)
-            print(cal_p.get_params())
 
             cal_up = CalibratedClassifierCV(reg, cv='prefit')
             cal_up.fit(_drop_protected(self.dataset, X_up_test), y_up_test)
             classifiers_up.append(cal_up)
-            print(cal_up.get_params())
 
         def h_pr(x):
             scores = np.zeros(len(x))
@@ -89,33 +93,6 @@ class CalibratedLogisticLearner(object):
         self.h_pr = h_pr
         self.h = h
 
-    def bak(self):
-        if False:
-            from sklearn.calibration import calibration_curve
-
-            p_y, p_x = calibration_curve(y_p_test, reg.predict_proba(_drop_protected(self.dataset, X_p_test))[:,1], n_bins=10)
-            up_y, up_x = calibration_curve(y_up_test, reg.predict_proba(_drop_protected(self.dataset, X_up_test))[:,1], n_bins=10)
-
-            import matplotlib.pyplot as plt
-            import matplotlib.lines as mlines
-            import matplotlib.transforms as mtransforms
-
-
-            fig, ax = plt.subplots()
-            # only these two lines are calibration curves
-            plt.plot(p_x,p_y, marker='o', linewidth=1, label='p')
-            plt.plot(up_x, up_y, marker='o', linewidth=1, label='up')
-
-            # reference line, legends, and axis labels
-            line = mlines.Line2D([0, 1], [0, 1], color='black')
-            transform = ax.transAxes
-            line.set_transform(transform)
-            ax.add_line(line)
-            fig.suptitle('Calibration plot for Titanic data')
-            ax.set_xlabel('Predicted probability')
-            ax.set_ylabel('True probability in each bin')
-            plt.legend()
-            #plt.show()
 
     def predict_proba(self, x):
         return self.h_pr(x)

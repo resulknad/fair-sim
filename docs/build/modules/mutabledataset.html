@@ -1,0 +1,311 @@
+
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta charset="utf-8" />
+    <title>mutabledataset &#8212; fair-sim  documentation</title>
+    <link rel="stylesheet" href="../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+    <script type="text/javascript" src="../_static/jquery.js"></script>
+    <script type="text/javascript" src="../_static/underscore.js"></script>
+    <script type="text/javascript" src="../_static/doctools.js"></script>
+    <script type="text/javascript" src="../_static/language_data.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="prev" title="simulation" href="simulation.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <div class="section" id="mutabledataset">
+<h1><code class="xref py py-mod docutils literal notranslate"><span class="pre">mutabledataset</span></code><a class="headerlink" href="#mutabledataset" title="Permalink to this headline">¶</a></h1>
+<dl class="class">
+<dt id="mutabledataset.GermanSimDataset">
+<em class="property">class </em><code class="sig-prename descclassname">mutabledataset.</code><code class="sig-name descname">GermanSimDataset</code><span class="sig-paren">(</span><em class="sig-param">*args</em>, <em class="sig-param">**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#mutabledataset.GermanSimDataset" title="Permalink to this definition">¶</a></dt>
+<dd><p>Inherits from AIF360s <cite>GermanDataset</cite> and <a class="reference internal" href="#mutabledataset.simmixin.SimMixin" title="mutabledataset.simmixin.SimMixin"><code class="xref py py-obj docutils literal notranslate"><span class="pre">mutabledataset.simmixin.SimMixin</span></code></a>. Some additional pre-processing is done here.</p>
+</dd></dl>
+
+<dl class="class">
+<dt id="mutabledataset.simmixin.SimMixin">
+<em class="property">class </em><code class="sig-prename descclassname">mutabledataset.simmixin.</code><code class="sig-name descname">SimMixin</code><span class="sig-paren">(</span><em class="sig-param">mutable_features=[]</em>, <em class="sig-param">domains={}</em>, <em class="sig-param">cost_fns={}</em>, <em class="sig-param">discrete=[]</em><span class="sig-paren">)</span><a class="headerlink" href="#mutabledataset.simmixin.SimMixin" title="Permalink to this definition">¶</a></dt>
+<dd><p>Mixin, extending AIF360s StructuredDataset with functionalities necessary for the simulation</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>mutable_features</strong> – List of feature names which are mutable</p></li>
+<li><p><strong>domains</strong> – Dict specifying the domain for each feature</p></li>
+<li><p><strong>cost_fns</strong> – Dict specifying cost functions (lambda) for each feature.</p></li>
+<li><p><strong>discrete</strong> – List of discrete feature names.</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="method">
+<dt id="mutabledataset.simmixin.SimMixin._continuous_and_mutable">
+<code class="sig-name descname">_continuous_and_mutable</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#mutabledataset.simmixin.SimMixin._continuous_and_mutable" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><p>Continious and mutable feature names.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="mutabledataset.simmixin.SimMixin._dedummy_code_obj">
+<code class="sig-name descname">_dedummy_code_obj</code><span class="sig-paren">(</span><em class="sig-param">obj</em>, <em class="sig-param">sep='='</em><span class="sig-paren">)</span><a class="headerlink" href="#mutabledataset.simmixin.SimMixin._dedummy_code_obj" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>obj</strong> – Instance (feature values) in object form (dict)</p></li>
+<li><p><strong>sep</strong> – Seperator used for dummy coding</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>dedummy coded object</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="mutabledataset.simmixin.SimMixin._discrete_and_mutable">
+<code class="sig-name descname">_discrete_and_mutable</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#mutabledataset.simmixin.SimMixin._discrete_and_mutable" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><p>Discrete and mutable feature names.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="mutabledataset.simmixin.SimMixin._dummy_code_obj">
+<code class="sig-name descname">_dummy_code_obj</code><span class="sig-paren">(</span><em class="sig-param">obj</em>, <em class="sig-param">sep='='</em><span class="sig-paren">)</span><a class="headerlink" href="#mutabledataset.simmixin.SimMixin._dummy_code_obj" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>obj</strong> – Instance (feature values) in object form (dict)</p></li>
+<li><p><strong>sep</strong> – Seperator used for dummy coding</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>dummy coded object</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="mutabledataset.simmixin.SimMixin._ft_index">
+<code class="sig-name descname">_ft_index</code><span class="sig-paren">(</span><em class="sig-param">ft</em><span class="sig-paren">)</span><a class="headerlink" href="#mutabledataset.simmixin.SimMixin._ft_index" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>ft</strong> – Feature name</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>index of feature (position in dataframe)</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="mutabledataset.simmixin.SimMixin._get_domain">
+<code class="sig-name descname">_get_domain</code><span class="sig-paren">(</span><em class="sig-param">ft</em><span class="sig-paren">)</span><a class="headerlink" href="#mutabledataset.simmixin.SimMixin._get_domain" title="Permalink to this definition">¶</a></dt>
+<dd><p>Infers domain of feature.
+:param ft: Feature name
+:returns: Domain</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="mutabledataset.simmixin.SimMixin._is_dummy_coded">
+<code class="sig-name descname">_is_dummy_coded</code><span class="sig-paren">(</span><em class="sig-param">ft</em><span class="sig-paren">)</span><a class="headerlink" href="#mutabledataset.simmixin.SimMixin._is_dummy_coded" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>ft</strong> – Feature name</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>True if ft is dummycoded</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="mutabledataset.simmixin.SimMixin.continuous_domains">
+<code class="sig-name descname">continuous_domains</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#mutabledataset.simmixin.SimMixin.continuous_domains" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><p>Continious domains.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="mutabledataset.simmixin.SimMixin.discrete_permutations">
+<code class="sig-name descname">discrete_permutations</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#mutabledataset.simmixin.SimMixin.discrete_permutations" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><p>Iterator over all possible feature value combinations for discrete mutable features.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="mutabledataset.simmixin.SimMixin.dynamic_cost">
+<code class="sig-name descname">dynamic_cost</code><span class="sig-paren">(</span><em class="sig-param">X_new</em>, <em class="sig-param">X</em><span class="sig-paren">)</span><a class="headerlink" href="#mutabledataset.simmixin.SimMixin.dynamic_cost" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns cost of feature manipulation (as defined in <cite>self.cost_fns</cite>) from <cite>X</cite> to <cite>X_new</cite>.
+:param X_new: Feature matrix (dimension <cite>n_instances x n_features</cite>)
+:param X: Feature matrix (dimension <cite>n_instances x n_features</cite>)
+:returns: List (dimension <cite>n_instances</cite> x 1) with manipulation cost.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="mutabledataset.simmixin.SimMixin.enforce_dummy_coded">
+<code class="sig-name descname">enforce_dummy_coded</code><span class="sig-paren">(</span><em class="sig-param">X</em><span class="sig-paren">)</span><a class="headerlink" href="#mutabledataset.simmixin.SimMixin.enforce_dummy_coded" title="Permalink to this definition">¶</a></dt>
+<dd><p>Enforces that for dummycoded features exactly one feature is set to 1, all the others to 0. Called after gradient ascend.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>X</strong> – Feature matrix (dimension <cite>n_instances x n_features</cite>)</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>X’ (modified feature matrix)</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="mutabledataset.simmixin.SimMixin.infer_domain">
+<code class="sig-name descname">infer_domain</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#mutabledataset.simmixin.SimMixin.infer_domain" title="Permalink to this definition">¶</a></dt>
+<dd><p>Automatically infers domain for features where domain was set to <cite>‘auto’</cite></p>
+</dd></dl>
+
+<dl class="method">
+<dt id="mutabledataset.simmixin.SimMixin.obj_to_vector">
+<code class="sig-name descname">obj_to_vector</code><span class="sig-paren">(</span><em class="sig-param">obj</em><span class="sig-paren">)</span><a class="headerlink" href="#mutabledataset.simmixin.SimMixin.obj_to_vector" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>obj</strong> – Instance (feature values) in object form (dict)</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>Instance (feature values) in vector form</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="mutabledataset.simmixin.SimMixin.rank_fns">
+<code class="sig-name descname">rank_fns</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#mutabledataset.simmixin.SimMixin.rank_fns" title="Permalink to this definition">¶</a></dt>
+<dd><p>Precomputes the rank functions, which may be used in cost functions. Note that this function creates one rank funktion per protected group and feature.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="mutabledataset.simmixin.SimMixin.scale_dummy_coded">
+<code class="sig-name descname">scale_dummy_coded</code><span class="sig-paren">(</span><em class="sig-param">X</em><span class="sig-paren">)</span><a class="headerlink" href="#mutabledataset.simmixin.SimMixin.scale_dummy_coded" title="Permalink to this definition">¶</a></dt>
+<dd><p>Ensures that the values for one dummy-coded feature sum up to 1 (scales accordingly). Called during gradient ascend. You may find an in-depth explanation in the write-up.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>X</strong> – Feature matrix (dimension <cite>n_instances x n_features</cite>)</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>X’ (modified feature matrix)</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="mutabledataset.simmixin.SimMixin.vector_to_object">
+<code class="sig-name descname">vector_to_object</code><span class="sig-paren">(</span><em class="sig-param">vec</em><span class="sig-paren">)</span><a class="headerlink" href="#mutabledataset.simmixin.SimMixin.vector_to_object" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>vec</strong> – Instance (feature values) in vector form</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>Instance (feature values) in object form (dict)</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../index.html">fair-sim</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<p class="caption"><span class="caption-text">Modules</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="transformation.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">transformer</span></code></a></li>
+<li class="toctree-l1"><a class="reference internal" href="simulation.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">simulation</span></code></a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#"><code class="xref py py-mod docutils literal notranslate"><span class="pre">mutabledataset</span></code></a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+      <li>Previous: <a href="simulation.html" title="previous chapter"><code class="xref py py-mod docutils literal notranslate"><span class="pre">simulation</span></code></a></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2019, Dan Kluser.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 2.1.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/modules/mutabledataset.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

@@ -5,7 +5,7 @@
 #       extension: .py
 #       format_name: light
 #       format_version: '1.4'
-#       jupytext_version: 1.1.1
+#       jupytext_version: 1.1.7
 #   kernelspec:
 #     display_name: Python 3
 #     language: python
@@ -148,15 +148,14 @@ def dataset():
                              **{a: c_immutable for a in immutable}},
                          privileged_classes=priv_classes,
                          features_to_drop=['personal_status', 'sex', 'foreign_worker'])
-def do_sim(learner, cost_fixed=cost_fixed, cost_fixed_dep=None, collect_incentive_data=False, no_neighbors=60):
+def do_sim(learner, cost_fixed=cost_fixed, cost_fixed_dep=None, collect_incentive_data=False, max_it=60):
     data = dataset()
     sim = Simulation(data,
                      DefaultAgent,
                      learner,
                      cost_fixed if cost_fixed_dep is None else None,
                      collect_incentive_data=collect_incentive_data,
-                     avg_out_incentive=1,
-                     no_neighbors=no_neighbors,
+                     max_it=max_it,
                      cost_distribution_dep=cost_fixed_dep,
                      split=[0.9])
 
@@ -178,7 +177,7 @@ def load(filename):
 
 # -
 
-C_EXECUTE = False
+C_EXECUTE = True
 data = dataset()
 
 
@@ -235,45 +234,58 @@ plot.boxplot(rss, unprivileged_group, privileged_group)
 # Compare different notions of fairness
 
 data = dataset()
-COST_CONST = 2
+COST_CONST = 8
 data = dataset()
-learners = [("no constraint", LogisticLearner(exclude_protected=True)),
+learners = [("no constraint", LogisticLearner(exclude_protected=False)),
             ("calibration", CalibratedLogisticLearner([privileged_group], [unprivileged_group])),
-            ("statistical parity", RejectOptionsLogisticLearner([privileged_group], [unprivileged_group])),
-            ("average odds", RejectOptionsLogisticLearner([privileged_group], [unprivileged_group], metric_name='Average odds difference'))]
+            ("statistical parity", RejectOptionsLogisticLearner([privileged_group], [unprivileged_group], exclude_protected=False)),
+            ("average odds", RejectOptionsLogisticLearner([privileged_group], [unprivileged_group], metric_name='Average odds difference', exclude_protected=False))]
 
 
 if C_EXECUTE:
     # execute
-    rss = list(map(lambda x: (x[0],do_sim(x[1], no_neighbors=130)), learners))
+    rss = list(map(lambda x: (x[0],do_sim(x[1], max_it=50)), learners))
     # save
-    save(rss, "notions_of_fairness_" + str(COST_CONST))
+    save(rss, "notions_of_fairness_lr_1_bf_" + str(COST_CONST))
+# -
+
+plot.boxplot(rss, unprivileged_group, privileged_group, name='sdffsdfdsfd')
+#display(rss[0][1].feature_table([unprivileged_group, privileged_group]))
 
 # +
-filename = "notions_of_fairness_2"
+filename = "notions_of_fairness_bf_8"
 rss = load(filename)
-
-for ft in all_mutable_dedummy:
-    for name, rs in rss:
-        display(Markdown("#### " + ft + ", " + name))
-        plot.plot_all_mutable_features(rs, unprivileged_group, privileged_group, dataset, [ft], name=filename+'_'+name, kind='cdf')
-
 plot.boxplot(rss, unprivileged_group, privileged_group, name=filename)
+
+if False:
+    plot.plot_all_mutable_features_combined(rss, unprivileged_group, privileged_group, dataset, 'purpose', filename=filename, kind='cdf', select_group='1', barplot_delta=True)
+    plot.plot_all_mutable_features_combined(rss, unprivileged_group, privileged_group, dataset, 'purpose', filename=filename, kind='cdf', select_group='0', barplot_delta=True)
+
+    plot.plot_all_mutable_features_combined(rss, unprivileged_group, privileged_group, dataset, 'savings', filename=filename, kind='cdf', select_group='1')
+    plot.plot_all_mutable_features_combined(rss, unprivileged_group, privileged_group, dataset, 'savings', filename=filename, kind='cdf', select_group='0')
+
+#for ft in all_mutable_dedummy:
+#    if ft == 'savings':
+#        for name, rs in rss:
+#            display(Markdown("#### " + ft + ", " + name))
+#            plot.plot_all_mutable_features(rs, unprivileged_group, privileged_group, dataset, [ft], name=filename+'_'+name, kind='cdf')
+#
+#
 
 # -
 # # Statistical Parity Comparison
 
 data = dataset()
-COST_CONST = 2
-learners = [("no constraint", LogisticLearner(exclude_protected=True)),
+COST_CONST = 8
+learners = [("no constraint", LogisticLearner(exclude_protected=False)),
     ("pre", ReweighingLogisticLearner([privileged_group], [unprivileged_group])),
     ("in",FairLearnLearner([privileged_group], [unprivileged_group])),
     ("post",RejectOptionsLogisticLearner([privileged_group], [unprivileged_group]))]
 if C_EXECUTE:
     # execute
-    rss = list(map(lambda x: (x[0],do_sim(x[1], no_neighbors=130)), learners))
+    rss = list(map(lambda x: (x[0],do_sim(x[1], max_it=130)), learners))
     # save
-    save(rss, "statpar_comp_cost_" + str(COST_CONST))
+    save(rss, "statpar_comp_cost_bf" + str(COST_CONST))
 
 
 indx = 27
@@ -285,17 +297,28 @@ print(rss[0][1].results[0].df_new['credit_h_pr'][indx])
 dict(zip(dataset().feature_names, rss[0][1].results[0].incentives[61]['features'][indx]-rss[0][1].results[0].incentives[59]['features'][indx]))
 
 # +
-filename = "statpar_comp_cost_8"
+filename = "statpar_comp_cost_bf8"
 rss = load(filename)
 rss[0] = ('no constraint', rss[0][1])
 save(rss, filename)
 
-for ft in all_mutable_dedummy:
-    for name, rs in rss:
-        display(Markdown("#### " + ft + ", " + name))
-        plot.plot_all_mutable_features(rs, unprivileged_group, privileged_group, dataset, [ft], name=filename+'_'+name, kind='cdf')
-
 plot.boxplot(rss, unprivileged_group, privileged_group, name=filename)
+if False:
+    plot.plot_all_mutable_features_combined(rss, unprivileged_group, privileged_group, dataset, 'purpose', filename=filename, kind='cdf', select_group='1', barplot_delta=True)
+    plot.plot_all_mutable_features_combined(rss, unprivileged_group, privileged_group, dataset, 'purpose', filename=filename, kind='cdf', select_group='0', barplot_delta=True)
+
+    plot.plot_all_mutable_features_combined(rss, unprivileged_group, privileged_group, dataset, 'savings', filename=filename, kind='cdf', select_group='1')
+    plot.plot_all_mutable_features_combined(rss, unprivileged_group, privileged_group, dataset, 'savings', filename=filename, kind='cdf', select_group='0')
+
+#plot.plot_all_mutable_features_combined(rss, unprivileged_group, privileged_group, dataset, 'savings', filename=filename, kind='cdf', select_group='0')
+
+#for ft in all_mutable_dedummy:
+#    for name, rs in rss:
+#        if ft == 'purpose':
+#            display(Markdown("#### " + ft + ", " + name))
+#            plot.plot_all_mutable_features(rs, unprivileged_group, privileged_group, dataset, [ft], name=filename+'_'+name, kind='cdf')
+
+#plot.boxplot(rss, unprivileged_group, privileged_group, name=filename)
 # -
 # # Colorblind vs Colorsighted
 

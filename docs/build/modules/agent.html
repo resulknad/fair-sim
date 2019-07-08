@@ -1,0 +1,169 @@
+
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta charset="utf-8" />
+    <title>agent &#8212; fair-sim  documentation</title>
+    <link rel="stylesheet" href="../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+    <script type="text/javascript" src="../_static/jquery.js"></script>
+    <script type="text/javascript" src="../_static/underscore.js"></script>
+    <script type="text/javascript" src="../_static/doctools.js"></script>
+    <script type="text/javascript" src="../_static/language_data.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="prev" title="learner" href="learner.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <div class="section" id="agent">
+<h1><code class="xref py py-mod docutils literal notranslate"><span class="pre">agent</span></code><a class="headerlink" href="#agent" title="Permalink to this headline">¶</a></h1>
+<dl class="class">
+<dt id="agent.RationalAgent">
+<em class="property">class </em><code class="sig-prename descclassname">agent.</code><code class="sig-name descname">RationalAgent</code><span class="sig-paren">(</span><em class="sig-param">h</em>, <em class="sig-param">dataset</em>, <em class="sig-param">cost</em>, <em class="sig-param">X</em>, <em class="sig-param">y</em><span class="sig-paren">)</span><a class="headerlink" href="#agent.RationalAgent" title="Permalink to this definition">¶</a></dt>
+<dd><p>Describing the behavior of agents, namely their <cite>utility</cite>, <cite>cost</cite> and <cite>benefit</cite> for specific manipulations.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>h</strong> – Trained instance of some <cite>learner</cite>, supporting <cite>predict</cite> and <cite>predict_proba</cite>.</p></li>
+<li><p><strong>dataset</strong> – Some dataset extending <cite>SimMixin</cite></p></li>
+<li><p><strong>cost</strong> – Function that calculates the cost of manipulation</p></li>
+<li><p><strong>X</strong> – Feature matrix</p></li>
+<li><p><strong>y</strong> – Labels</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="method">
+<dt id="agent.RationalAgent.benefit">
+<code class="sig-name descname">benefit</code><span class="sig-paren">(</span><em class="sig-param">X_new</em><span class="sig-paren">)</span><a class="headerlink" href="#agent.RationalAgent.benefit" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns benefit of manipulation from initial <cite>X</cite> to <cite>X_new</cite>. In this case this is simply the difference of scores as returned by the predictor <cite>h.predict_proba</cite>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>X_new</strong> – Manipulated feature matrix.</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>Vector of benefits</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="agent.RationalAgent.cost">
+<code class="sig-name descname">cost</code><span class="sig-paren">(</span><em class="sig-param">X_new</em><span class="sig-paren">)</span><a class="headerlink" href="#agent.RationalAgent.cost" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns cost of manipulation. The cost functions passed to the <cite>Simulation</cite> class are used here.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>X_new</strong> – Manipulated feature matrix.</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>Vector of costs</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="agent.RationalAgent.incentive">
+<code class="sig-name descname">incentive</code><span class="sig-paren">(</span><em class="sig-param">X_new</em><span class="sig-paren">)</span><a class="headerlink" href="#agent.RationalAgent.incentive" title="Permalink to this definition">¶</a></dt>
+<dd><p>Calculates incentive (or utility) of manipulations. In this instance this is simply the difference of benefit and cost.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>X_new</strong> – Manipulated feature matrix.</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>Vector of incentives</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../index.html">fair-sim</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<p class="caption"><span class="caption-text">Modules</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="transformation.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">transformer</span></code></a></li>
+<li class="toctree-l1"><a class="reference internal" href="simulation.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">simulation</span></code></a></li>
+<li class="toctree-l1"><a class="reference internal" href="mutabledataset.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">mutabledataset</span></code></a></li>
+<li class="toctree-l1"><a class="reference internal" href="learner.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">learner</span></code></a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#"><code class="xref py py-mod docutils literal notranslate"><span class="pre">agent</span></code></a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+      <li>Previous: <a href="learner.html" title="previous chapter"><code class="xref py py-mod docutils literal notranslate"><span class="pre">learner</span></code></a></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2019, Dan Kluser.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 2.1.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/modules/agent.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

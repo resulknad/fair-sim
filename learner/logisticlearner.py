@@ -1,7 +1,12 @@
 from sklearn.linear_model import LogisticRegression
 from .utils import _drop_protected
 import numpy as np
-class LogisticLearner(object):
+from .generallearner import GeneralLearner
+class LogisticLearner(GeneralLearner):
+    """Unconstrained Logistic Regression learner.
+
+    :param exclude_protected: if true, learner ignores protected attribute during training
+    """
     threshold = 0.5
     def __init__(self, exclude_protected=False):
         self.exclude_protected = exclude_protected

@@ -2,7 +2,9 @@ from sklearn.naive_bayes import GaussianNB
 from .utils import _drop_protected
 import numpy as np
 
-class GaussianNBLearner(object):
+from .generallearner import GeneralLearner
+class GaussianNBLearner(GeneralLearner):
+    """A unconstrained naive bayes model is used for this learner."""
     threshold = 0.5
     def __init__(self, exclude_protected=False):
         self.exclude_protected = exclude_protected

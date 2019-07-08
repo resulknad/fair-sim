@@ -21,6 +21,7 @@ seaborn = "*"
 fairlearn = "*"
 nest_asyncio = "*"
 jupytext = "*"
+colour = "*"
 
 [requires]
 python_version = "3.7"

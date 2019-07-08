@@ -9,6 +9,14 @@ from aif360.datasets import BinaryLabelDataset
 from scipy.stats import percentileofscore
 
 class SimMixin:
+    """
+    Mixin, extending AIF360s StructuredDataset with functionalities necessary for the simulation
+
+    :param mutable_features: List of feature names which are mutable
+    :param domains: Dict specifying the domain for each feature
+    :param cost_fns: Dict specifying cost functions (lambda) for each feature.
+    :param discrete: List of discrete feature names.
+    """
     def __init__(self, mutable_features=[], domains={}, cost_fns={}, discrete=[]):
         # assert(len(mutable_features)==len(domains)==len(cost_fns)==len(discrete))
         self.mutable_features = mutable_features
@@ -20,12 +28,20 @@ class SimMixin:
         self.cost_fns = cost_fns
 
     def infer_domain(self):
+        """
+        Automatically infers domain for features where domain was set to `'auto'`
+        """
         # handle domain != list
         self.domains = {k: self._get_domain(k) if type(v) is not list else v for k,v in self.domains.items()}
         self.ranks = self.rank_fns()
 
     def scale_dummy_coded(self, X):
+        """
+        Ensures that the values for one dummy-coded feature sum up to 1 (scales accordingly). Called during gradient ascend. You may find an in-depth explanation in the write-up.
 
+        :param X: Feature matrix (dimension `n_instances x n_features`)
+        :returns: X' (modified feature matrix)
+        """
         #print(np.where(X[:,12]>0.8))
 
         for k,v in StructuredDataset._parse_feature_names(self.feature_names)[0].items():
@@ -41,6 +57,12 @@ class SimMixin:
         return X
 
     def enforce_dummy_coded(self, X):
+        """
+        Enforces that for dummycoded features exactly one feature is set to 1, all the others to 0. Called after gradient ascend.
+
+        :param X: Feature matrix (dimension `n_instances x n_features`)
+        :returns: X' (modified feature matrix)
+        """
         for k,v in StructuredDataset._parse_feature_names(self.feature_names)[0].items():
             ft_indices = (list(map(lambda x: self.feature_names.index(k + '=' + x), v)))
 #            print(k,ft_indices, v)
@@ -62,6 +84,10 @@ class SimMixin:
         return X
 
     def rank_fns(self):
+        """
+        Precomputes the rank functions, which may be used in cost functions. Note that this function creates one rank funktion per protected group and feature.
+        """
+
         X = self.features
 
         assert(len(self.protected_attribute_names)==1)
@@ -87,17 +113,34 @@ class SimMixin:
         return ranks
 
     def _is_dummy_coded(self, ft):
+        """
+        :param ft: Feature name
+        :returns: True if ft is dummycoded
+        """
         # fix this
         return len(StructuredDataset._parse_feature_names(self.feature_names)[0][ft])
 
     def vector_to_object(self, vec):
+        """
+        :param vec: Instance (feature values) in vector form
+        :returns: Instance (feature values) in object form (dict)
+        """
         return self._dedummy_code_obj({ft: v for ft,v in zip(self.feature_names, vec)})
 
     def obj_to_vector(self, obj):
+        """
+        :param obj: Instance (feature values) in object form (dict)
+        :returns: Instance (feature values) in vector form
+        """
         obj = self._dummy_code_obj(obj)
         return [obj.get(k, None) for k in self.feature_names]
 
     def _dedummy_code_obj(self, obj, sep='='):
+        """
+        :param obj: Instance (feature values) in object form (dict)
+        :param sep: Seperator used for dummy coding
+        :returns: dedummy coded object
+        """
         # reimplemented this bc library is too slow for one row only...
         result_obj = obj.copy()
         for k,v in (StructuredDataset._parse_feature_names(self.feature_names)[0]).items():
@@ -114,9 +157,18 @@ class SimMixin:
         return result_obj
 
     def _ft_index(self, ft):
+        """
+        :param ft: Feature name
+        :returns: index of feature (position in dataframe)
+        """
         return self.feature_names.index(ft)
 
     def _dummy_code_obj(self, obj, sep='='):
+        """
+        :param obj: Instance (feature values) in object form (dict)
+        :param sep: Seperator used for dummy coding
+        :returns: dummy coded object
+        """
         result_obj = {}
         for k,v in obj.items():
             if self._is_dummy_coded(k):
@@ -128,6 +180,12 @@ class SimMixin:
         return result_obj
 
     def dynamic_cost(self, X_new, X):
+        """
+        Returns cost of feature manipulation (as defined in `self.cost_fns`) from `X` to `X_new`.
+        :param X_new: Feature matrix (dimension `n_instances x n_features`)
+        :param X: Feature matrix (dimension `n_instances x n_features`)
+        :returns: List (dimension `n_instances` x 1) with manipulation cost.
+        """
        # if len(X_new) == 1:
        #     print(dict(zip(self.feature_names, X[0]))['age'])
        #     print(dict(zip(self.feature_names, X_new[0]))['age'])
@@ -135,10 +193,6 @@ class SimMixin:
         group_attr = self.protected_attribute_names[0]
         group_ind = self.feature_names.index(group_attr)
         group_vals = list(set(X[:,group_ind]))
-
-
-
-
 
         cost = np.zeros(len(X), dtype=np.float64)
 
@@ -157,6 +211,11 @@ class SimMixin:
 
 
     def _get_domain(self, ft):
+        """
+        Infers domain of feature.
+        :param ft: Feature name
+        :returns: Domain
+        """
         if callable(self.domains[ft]):
             return [self.domains[ft]()]
         elif self._is_dummy_coded(ft):
@@ -175,18 +234,30 @@ class SimMixin:
             return (min(df[ft]), max(df[:,ft]))
 
     def _discrete_and_mutable(self):
+        """
+        :returns: Discrete and mutable feature names.
+        """
         return list(set(self.mutable_features) & set(self.discrete))
 
     def _continuous_and_mutable(self):
+        """
+        :returns: Continious and mutable feature names.
+        """
         return list(set(self.mutable_features) - set(self.discrete))
 
     def continuous_domains(self):
+        """
+        :returns: Continious domains.
+        """
         ft_names = self._continuous_domains()
         domains = [self.domains[x] for x in ft_names]
 
         return (ft_names, domains)
 
     def discrete_permutations(self):
+        """
+        :returns: Iterator over all possible feature value combinations for discrete mutable features.
+        """
         ft_names = self._discrete_and_mutable()
         domains = [self.domains[x] for x in ft_names]
 

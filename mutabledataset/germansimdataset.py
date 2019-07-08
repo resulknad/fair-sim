@@ -32,6 +32,9 @@ def custom_preprocessing(df):
     return df
 
 class GermanSimDataset(GermanDataset, SimMixin):
+    """
+    Inherits from AIF360s `GermanDataset` and :py:obj:`mutabledataset.simmixin.SimMixin`. Some additional pre-processing is done here.
+    """
     def __init__(self, *args, **kwargs):
         # remove arguments for sim_args constructor
         sim_args_names = ['mutable_features', 'domains', 'cost_fns', 'discrete']

@@ -1,5 +1,7 @@
 
-class MetaFairLearner(object):
+from .generallearner import GeneralLearner
+class MetaFairLearner(GeneralLearner):
+    """Learner using the MetaFair in-processing technique."""
     def __init__(self, privileged_group, unprivileged_group):
         self.privileged_group = privileged_group
         self.unprivileged_group = unprivileged_group
